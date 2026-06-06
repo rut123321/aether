@@ -533,8 +533,14 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
 
   if (usingCustomKey) {
     // Check if this is a streaming request
-    const isStream = requestBody && requestBody.toString().includes('"stream":true');
-    
+    let isStream = false;
+    if (requestBody) {
+      try {
+        const body = JSON.parse(requestBody.toString());
+        isStream = body.stream === true;
+      } catch {}
+    }
+
     if (isStream) {
       // Handle streaming response to deduct credits
       const reader = upstreamResponse.body.getReader();
