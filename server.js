@@ -558,7 +558,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
           stream.push(null);
           // Fallback: estimate tokens from characters if usage not provided (~4 chars = 1 token)
           const estimatedTokens = totalTokens || Math.ceil((requestCharCount + responseCharCount) / 4);
-          const creditsToDeduct = Math.ceil(Math.max(estimatedTokens, 1) * 100);
+          const creditsToDeduct = Math.ceil(Math.max(estimatedTokens, 1) * 10);
           if (creditsToDeduct > 0 && apiKeys[customApiKey]) {
             apiKeys[customApiKey].credits -= creditsToDeduct;
             await saveKeys();
@@ -595,7 +595,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       try {
         const responseData = JSON.parse(responseText);
         const totalTokens = responseData.usage?.total_tokens || 0;
-        const creditsToDeduct = Math.ceil(Math.max(totalTokens, 1) * 100);
+        const creditsToDeduct = Math.ceil(Math.max(totalTokens, 1) * 10);
         if (creditsToDeduct > 0 && apiKeys[customApiKey]) {
           apiKeys[customApiKey].credits -= creditsToDeduct;
           await saveKeys();
