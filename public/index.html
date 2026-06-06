@@ -7,6 +7,24 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div id="loginOverlay" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: var(--bg);">
+      <div style="width: 100%; max-width: 400px; padding: 40px; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-lg);">
+        <div style="text-align: center; margin-bottom: 28px;">
+          <div style="display: inline-grid; width: 48px; height: 48px; place-items: center; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--primary); font-weight: 700; font-size: 18px; margin-bottom: 16px; border: 1px solid var(--line-strong);">AE</div>
+          <h2 style="margin: 0 0 6px; font-size: 22px; font-weight: 700;">Aether</h2>
+          <p style="margin: 0; color: var(--muted); font-size: 14px;">Введите пароль для доступа</p>
+        </div>
+        <form id="loginForm" style="display: grid; gap: 14px;">
+          <label style="display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;">
+            Пароль администратора
+            <input id="loginPassword" type="password" placeholder="Введите пароль" required style="min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--ink); padding: 10px 16px; font-size: 14px; outline: none;" />
+          </label>
+          <button type="submit" class="primary-button" style="width: 100%; margin-top: 4px;">Войти</button>
+          <p id="loginError" style="color: var(--danger); font-size: 13px; margin: 0; text-align: center; display: none;">Неверный пароль</p>
+        </form>
+      </div>
+    </div>
+
     <main class="shell">
       <section class="workspace" aria-label="AgentRouter endpoint dashboard">
         <aside class="sidebar">

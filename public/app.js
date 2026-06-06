@@ -2,7 +2,10 @@ const STORAGE_KEYS = {
   keys: "agentrouter-endpoint.keys",
   activeId: "agentrouter-endpoint.activeId",
   adminToken: "agentrouter-endpoint.adminToken",
+  loginVerified: "agentrouter-endpoint.loginVerified",
 };
+
+const LOGIN_PASSWORD = "Murz123";
 
 const elements = {
   serverStatus: document.querySelector("#serverStatus"),
@@ -33,6 +36,10 @@ const elements = {
   totalKeys: document.querySelector("#totalKeys"),
   totalCredits: document.querySelector("#totalCredits"),
   activeKeys: document.querySelector("#activeKeys"),
+  loginOverlay: document.querySelector("#loginOverlay"),
+  loginForm: document.querySelector("#loginForm"),
+  loginPassword: document.querySelector("#loginPassword"),
+  loginError: document.querySelector("#loginError"),
 };
 
 let keys = loadKeys();
@@ -43,6 +50,7 @@ let allowsDirectUpstreamKeys = false;
 boot();
 
 async function boot() {
+  initLogin();
   renderEndpointInfo();
   renderKeys();
   bindEvents();
@@ -50,6 +58,27 @@ async function boot() {
   await loadCustomKeys();
   await loadStats();
   initTabs();
+}
+
+function initLogin() {
+  if (localStorage.getItem(STORAGE_KEYS.loginVerified) === "true") {
+    elements.loginOverlay.style.display = "none";
+    return;
+  }
+
+  elements.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const password = elements.loginPassword.value.trim();
+
+    if (password === LOGIN_PASSWORD) {
+      localStorage.setItem(STORAGE_KEYS.loginVerified, "true");
+      elements.loginOverlay.style.display = "none";
+    } else {
+      elements.loginError.style.display = "block";
+      elements.loginPassword.value = "";
+      elements.loginPassword.focus();
+    }
+  });
 }
 
 function bindEvents() {
