@@ -184,7 +184,7 @@
         const apiKey = document.getElementById("apiKey").value.trim();
         
         if (!apiKey) {
-          showResult("error", "❌ Ошибка", "Введите API ключ");
+          showResult("error", "Ошибка", "Введите API ключ");
           return;
         }
 
@@ -203,7 +203,7 @@
           if (response.ok) {
             showResult(
               "success",
-              "✅ Баланс найден",
+              "Баланс найден",
               `<div class="balance-info">
                 <div class="balance-info-item">
                   <label>Название</label>
@@ -216,10 +216,10 @@
               </div>`
             );
           } else {
-            showResult("error", "❌ Ошибка", data.error || "Ключ не найден");
+            showResult("error", "Ошибка", data.error || "Ключ не найден");
           }
         } catch (error) {
-          showResult("error", "❌ Ошибка", error.message);
+          showResult("error", "Ошибка", error.message);
         } finally {
           loading.classList.remove("show");
         }

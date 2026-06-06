@@ -182,10 +182,10 @@ function bindEvents() {
       const target = document.querySelector(`#${button.dataset.copyTarget}`);
       await navigator.clipboard.writeText(target.textContent.trim());
       const previous = button.textContent;
-      button.textContent = "✓";
+      button.textContent = "Готово";
       window.setTimeout(() => {
         button.textContent = previous;
-      }, 900);
+      }, 1200);
     });
   });
 }
@@ -468,8 +468,8 @@ function renderCustomKeys(keys) {
         <span>Кредиты: ${escapeHtml(key.credits)}</span>
       </div>
       <div class="key-actions">
-        <button class="icon-button" onclick="copyToClipboard('${escapeAttribute(key.fullKey)}')" title="Копировать">⧉</button>
-        <button class="danger-button" onclick="deleteCustomKey('${escapeAttribute(key.fullKey)}')" title="Удалить">✕</button>
+        <button class="icon-button" onclick="copyToClipboard('${escapeAttribute(key.fullKey)}')" title="Копировать">Коп</button>
+        <button class="danger-button" onclick="deleteCustomKey('${escapeAttribute(key.fullKey)}')" title="Удалить">Удл</button>
       </div>
     </div>
   `).join("");

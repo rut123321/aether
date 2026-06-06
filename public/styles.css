@@ -59,10 +59,6 @@ body {
   min-width: 320px;
   margin: 0;
   background: var(--bg);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(6, 182, 212, 0.04), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(99, 102, 241, 0.03), transparent);
-  background-attachment: fixed;
   color: var(--ink);
   font-family:
     "Inter",
@@ -113,9 +109,7 @@ code {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  background-image: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(6, 182, 212, 0.03), transparent);
-  box-shadow: var(--shadow-xl);
-  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-lg);
 }
 
 .sidebar {
@@ -125,7 +119,6 @@ code {
   padding: 28px 20px;
   border-right: 1px solid var(--line);
   background: var(--bg-elevated);
-  background-image: linear-gradient(180deg, rgba(6, 182, 212, 0.02), transparent 40%);
 }
 
 .brand {
@@ -136,16 +129,16 @@ code {
 
 .brand-mark {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border-radius: var(--radius);
-  background: var(--gradient-primary);
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 15px;
   letter-spacing: -0.5px;
-  box-shadow: 0 4px 20px var(--primary-glow);
+  border: 1px solid var(--line-strong);
 }
 
 .brand h1,
@@ -188,22 +181,16 @@ code {
   border: 1px solid transparent;
 }
 
-.nav-item span {
-  font-size: 16px;
-  opacity: 0.8;
-}
-
 .nav-item:hover {
-  background: rgba(6, 182, 212, 0.06);
+  background: rgba(6, 182, 212, 0.05);
   color: var(--ink);
-  border-color: rgba(6, 182, 212, 0.15);
+  border-color: var(--line-strong);
 }
 
 .nav-item.active {
-  background: rgba(6, 182, 212, 0.12);
+  background: rgba(6, 182, 212, 0.1);
   color: var(--primary-light);
-  border-color: rgba(6, 182, 212, 0.25);
-  box-shadow: 0 0 20px rgba(6, 182, 212, 0.08);
+  border-color: rgba(6, 182, 212, 0.2);
 }
 
 .endpoint-box {
@@ -215,8 +202,7 @@ code {
   padding: 14px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(10px);
+  background: var(--surface-2);
 }
 
 .endpoint-box span {
@@ -238,7 +224,6 @@ code {
   min-width: 0;
   padding: 32px 36px;
   background: var(--surface);
-  background-image: radial-gradient(ellipse 60% 50% at 70% 10%, rgba(99, 102, 241, 0.025), transparent);
   overflow-y: auto;
 }
 
@@ -438,16 +423,13 @@ textarea:focus {
 }
 
 .primary-button {
-  background: var(--gradient-primary);
+  background: var(--primary-dark);
   color: #ffffff;
   border: none;
-  box-shadow: 0 4px 15px rgba(6, 182, 212, 0.25);
 }
 
 .primary-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.35);
-  filter: brightness(1.1);
+  background: var(--primary);
 }
 
 .primary-button:active {
@@ -492,7 +474,6 @@ textarea:focus {
 .icon-button:hover {
   border-color: var(--primary);
   color: var(--primary-light);
-  background: rgba(6, 182, 212, 0.08);
 }
 
 .wide {
@@ -530,8 +511,6 @@ textarea:focus {
 
 .key-item:hover {
   border-color: var(--line-strong);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
 }
 
 .key-info {
@@ -733,26 +712,8 @@ pre {
   overflow: hidden;
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--gradient-primary);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
 .stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lg);
   border-color: var(--line-strong);
-}
-
-.stat-card:hover::before {
-  opacity: 1;
 }
 
 .stat-card .stat-value {
@@ -767,12 +728,6 @@ pre {
   color: var(--muted);
   font-size: 13px;
   font-weight: 500;
-}
-
-.stat-card .stat-icon {
-  font-size: 20px;
-  margin-bottom: 4px;
-  opacity: 0.8;
 }
 
 /* Toast notifications */
