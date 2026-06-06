@@ -36,6 +36,7 @@ function generateApiKey() {
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Murz123";
 const MAX_REQUEST_BYTES = readPositiveIntegerEnv(
   "MAX_REQUEST_BYTES",
   20 * 1024 * 1024,
@@ -119,6 +120,17 @@ const server = createServer(async (req, res) => {
             : "Set ADMIN_TOKEN in the deployed service environment.",
         },
       });
+      return;
+    }
+
+    // Admin password verification
+    if (url.pathname === "/api/admin/verify" && req.method === "POST") {
+      const { password } = await readJsonBody(req);
+      if (password === ADMIN_PASSWORD) {
+        sendJson(res, 200, { success: true });
+      } else {
+        sendJson(res, 401, { error: { message: "Invalid password" } });
+      }
       return;
     }
 

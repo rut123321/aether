@@ -127,8 +127,8 @@
     <div class="container">
       <h1>FAQ - Claude Code CLI Guide</h1>
 
-      <h2>Что такое Claude Code CLI?</h2>
-      <p>Claude Code CLI - это инструмент командной строки для работы с Claude AI прямо из терминала. Он позволяет использовать возможности Claude для кодирования, отладки и анализа кода без необходимости открывать браузер.</p>
+      <h2>Ваш Endpoint</h2>
+      <p>Base URL: <code id="endpointUrl">...</code></p>
 
       <h2>Как подключить Claude Code CLI к вашему endpoint</h2>
 
@@ -141,33 +141,45 @@
 
       <div class="step">
         <span class="step-number">2</span>
-        <strong>Получите ваш кастомный API ключ</strong>
-        <p>Перейдите на главную страницу вашего endpoint и создайте новый API ключ во вкладке "Выдать ключ". Скопируйте полученный ключ.</p>
+        <strong>Настройте Claude Code CLI</strong>
+        <p>Используйте ваш кастомный API ключ и Base URL:</p>
+        <pre><code># Linux/Mac
+export ANTHROPIC_API_KEY="ваш-кастомный-ключ"
+export ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"
+
+# Windows PowerShell
+$env:ANTHROPIC_API_KEY="ваш-кастомный-ключ"
+$env:ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"</code></pre>
       </div>
 
       <div class="step">
         <span class="step-number">3</span>
-        <strong>Настройте Claude Code CLI</strong>
-        <p>Создайте файл конфигурации или установите переменную окружения:</p>
-        <pre><code># Linux/Mac
-export ANTHROPIC_API_KEY="ваш-кастомный-ключ"
-export ANTHROPIC_BASE_URL="http://localhost:3000/v1"
-
-# Windows PowerShell
-$env:ANTHROPIC_API_KEY="ваш-кастомный-ключ"
-$env:ANTHROPIC_BASE_URL="http://localhost:3000/v1"</code></pre>
-      </div>
-
-      <div class="step">
-        <span class="step-number">4</span>
         <strong>Запустите Claude Code CLI</strong>
         <p>Теперь вы можете запустить Claude Code CLI:</p>
         <pre><code>claude-code</code></pre>
       </div>
 
-      <div class="warning">
-        <strong>⚠️ Важно:</strong> Убедитесь, что ваш сервер endpoint запущен и доступен по указанному URL. Если вы используете удалённый сервер, замените <code>localhost:3000</code> на ваш домен.
-      </div>
+      <h2>Использование с OpenAI SDK</h2>
+      <p>Вы также можете использовать стандартный OpenAI SDK:</p>
+      <pre><code>import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "<span class="base-url-placeholder">...</span>",
+  apiKey: "ваш-кастомный-ключ",
+});
+
+const response = await client.chat.completions.create({
+  model: "claude-opus-4-7",
+  messages: [{ role: "user", content: "Hello" }],
+});
+
+console.log(response.choices[0].message.content);</code></pre>
+
+      <h2>Использование с curl</h2>
+      <pre><code>curl <span class="base-url-placeholder">...</span>/chat/completions \
+  -H "Authorization: Bearer ваш-кастомный-ключ" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-opus-4-7","messages":[{"role":"user","content":"Hello"}]}'</code></pre>
 
       <h2>Дополнительные команды</h2>
       <ul>
@@ -184,16 +196,16 @@ $env:ANTHROPIC_BASE_URL="http://localhost:3000/v1"</code></pre>
       <h3>Почему я получаю ошибку "Invalid token"?</h3>
       <p>Убедитесь, что:</p>
       <ul>
-        <li>Вы используете кастомный API ключ, созданный на вашем endpoint</li>
+        <li>Вы используете кастомный API ключ, созданный на этом endpoint</li>
         <li>Ключ скопирован полностью без лишних пробелов</li>
-        <li>Сервер endpoint запущен и доступен</li>
+        <li>Сервер endpoint доступен</li>
       </ul>
 
       <h3>Как изменить модель?</h3>
       <p>Вы можете указать модель через флаг <code>--model</code> или в конфигурационном файле. Доступные модели: <code>claude-opus-4-7</code>, <code>claude-sonnet-4-5</code> и другие.</p>
 
       <h3>Сколько кредитов тратится?</h3>
-      <p>Кредиты тратятся в зависимости от количества токенов в запросе и ответе. 1 кредит ≈ 100 токенов. Вы можете проверить текущий баланс на странице /balance.</p>
+      <p>Кредиты тратятся в зависимости от количества токенов в запросе и ответе. 1 токен = 100 кредитов. Вы можете проверить текущий баланс на странице /balance.</p>
 
       <h3>Как увеличить лимит кредитов?</h3>
       <p>Свяжитесь с администратором endpoint для увеличения лимита кредитов на вашем ключе.</p>
@@ -202,5 +214,16 @@ $env:ANTHROPIC_BASE_URL="http://localhost:3000/v1"</code></pre>
         <a href="/">← Вернуться на главную</a>
       </div>
     </div>
+
+    <script>
+      // Auto-detect the current endpoint URL
+      const baseUrl = window.location.origin + "/v1";
+      document.getElementById("endpointUrl").textContent = baseUrl;
+      
+      // Update all placeholders with the actual base URL
+      document.querySelectorAll(".base-url-placeholder").forEach(el => {
+        el.textContent = baseUrl;
+      });
+    </script>
   </body>
 </html>

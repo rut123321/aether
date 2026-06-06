@@ -19,6 +19,9 @@ const elements = {
   streamInput: document.querySelector("#streamInput"),
   testKeySelect: document.querySelector("#testKeySelect"),
   responseOutput: document.querySelector("#responseOutput"),
+  adminPasswordForm: document.querySelector("#adminPasswordForm"),
+  adminPasswordInput: document.querySelector("#adminPasswordInput"),
+  adminPanel: document.querySelector("#adminPanel"),
   adminTokenForm: document.querySelector("#adminTokenForm"),
   adminTokenInput: document.querySelector("#adminTokenInput"),
   clearAdminTokenButton: document.querySelector("#clearAdminTokenButton"),
@@ -76,6 +79,36 @@ function bindEvents() {
     await loadCustomKeys();
     await loadStats();
     renderAdminTokenNotice();
+  });
+
+  elements.adminPasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const password = elements.adminPasswordInput.value.trim();
+    
+    if (!password) {
+      showToast("Введите пароль", "error");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        elements.adminPanel.style.display = "block";
+        elements.adminPasswordForm.style.display = "none";
+        showToast("Доступ разрешен", "success");
+        await loadCustomKeys();
+        await loadStats();
+      } else {
+        showToast("Неверный пароль", "error");
+      }
+    } catch (error) {
+      showToast("Ошибка проверки пароля", "error");
+    }
   });
 
   elements.keyForm.addEventListener("submit", (event) => {

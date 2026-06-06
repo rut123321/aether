@@ -56,33 +56,43 @@
               </div>
             </div>
 
-            <form id="adminTokenForm" class="key-form admin-token-form" autocomplete="off">
+            <form id="adminPasswordForm" class="key-form admin-token-form" autocomplete="off">
               <label>
-                Admin token
-                <input id="adminTokenInput" name="adminTokenInput" type="password" placeholder="ADMIN_TOKEN для публичного деплоя" />
+                Пароль администратора
+                <input id="adminPasswordInput" name="adminPasswordInput" type="password" placeholder="Введите пароль для доступа" />
               </label>
-              <button class="secondary-button" type="submit">Сохранить</button>
-              <button class="danger-button" id="clearAdminTokenButton" type="button">Сбросить</button>
+              <button class="primary-button" type="submit">Войти</button>
             </form>
 
-            <div class="notice" id="adminTokenNotice">
-              На публичном деплое API управления ключами требует ADMIN_TOKEN.
-            </div>
+            <div id="adminPanel" style="display: none;">
+              <form id="adminTokenForm" class="key-form admin-token-form" autocomplete="off">
+                <label>
+                  Admin token
+                  <input id="adminTokenInput" name="adminTokenInput" type="password" placeholder="ADMIN_TOKEN для публичного деплоя" />
+                </label>
+                <button class="secondary-button" type="submit">Сохранить</button>
+                <button class="danger-button" id="clearAdminTokenButton" type="button">Сбросить</button>
+              </form>
 
-            <form id="createKeyForm" class="key-form">
-              <label>
-                Название
-                <input id="newKeyName" name="newKeyName" type="text" placeholder="Client1, Project A" required />
-              </label>
-              <label>
-                Кредиты
-                <input id="newKeyCredits" name="newKeyCredits" type="number" min="1" value="100000000" required />
-              </label>
-              <button class="primary-button" type="submit">Создать ключ</button>
-            </form>
+              <div class="notice" id="adminTokenNotice">
+                На публичном деплое API управления ключами требует ADMIN_TOKEN.
+              </div>
 
-            <div class="keys-list" id="customKeysList">
-              <p>Загрузка ключей...</p>
+              <form id="createKeyForm" class="key-form">
+                <label>
+                  Название
+                  <input id="newKeyName" name="newKeyName" type="text" placeholder="Client1, Project A" required />
+                </label>
+                <label>
+                  Кредиты
+                  <input id="newKeyCredits" name="newKeyCredits" type="number" min="1" value="100000000" required />
+                </label>
+                <button class="primary-button" type="submit">Создать ключ</button>
+              </form>
+
+              <div class="keys-list" id="customKeysList">
+                <p>Загрузка ключей...</p>
+              </div>
             </div>
           </div>
 
