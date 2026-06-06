@@ -52,6 +52,7 @@ const UPSTREAM_USER_AGENT =
   process.env.UPSTREAM_USER_AGENT || "AetherEndpoint/1.0";
 const ALLOW_DIRECT_UPSTREAM_KEYS = process.env.ALLOW_DIRECT_UPSTREAM_KEYS === "true";
 const ALLOW_SERVER_KEY_PROXY = process.env.ALLOW_SERVER_KEY_PROXY === "true";
+const ALLOWED_MODELS = ["claude-opus-4-7", "glm-5.1"];
 const AGENTROUTER_CLIENT_PROFILE = process.env.AGENTROUTER_CLIENT_PROFILE || "none";
 const CODEX_COMPAT_VERSION = process.env.AGENTROUTER_CODEX_VERSION || "0.101.0";
 const CODEX_COMPAT_USER_AGENT =
@@ -317,6 +318,21 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
 
   const upstreamUrl = buildUpstreamUrl(incomingUrl);
   const requestBody = canHaveBody(req.method) ? await readRequestBody(req) : undefined;
+
+  // Validate model if present in request body
+  if (requestBody && requestBody.model) {
+    const requestedModel = String(requestBody.model);
+    if (!ALLOWED_MODELS.includes(requestedModel)) {
+      sendJson(res, 400, {
+        error: {
+          message: `Model "${requestedModel}" is not allowed`,
+          hint: `Allowed models: ${ALLOWED_MODELS.join(", ")}`,
+          type: "invalid_request_error",
+        },
+      });
+      return;
+    }
+  }
 
   const upstreamResult = await fetchUpstreamWithWafRetry(
     req,

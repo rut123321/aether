@@ -19,26 +19,22 @@
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-lg);
         background: var(--surface);
-        background-image: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(6, 182, 212, 0.04), transparent);
-        box-shadow: var(--shadow-xl);
+        box-shadow: var(--shadow-lg);
       }
       .faq-header {
         text-align: center;
         margin-bottom: 48px;
       }
       .faq-header h1 {
-        font-size: 36px;
-        margin-bottom: 12px;
-        background: var(--gradient-text);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        font-size: 32px;
+        margin-bottom: 8px;
+        color: var(--ink);
         font-weight: 700;
         letter-spacing: -0.5px;
       }
       .faq-header p {
         color: var(--muted);
-        font-size: 16px;
+        font-size: 15px;
       }
       .endpoint-url {
         display: inline-block;
@@ -47,9 +43,9 @@
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-sm);
         font-family: "JetBrains Mono", monospace;
-        color: var(--primary-light);
+        color: var(--primary);
         font-size: 13px;
-        margin: 20px 0;
+        margin: 16px 0;
       }
       .section {
         margin-bottom: 48px;
@@ -58,10 +54,9 @@
         font-size: 20px;
         margin-bottom: 24px;
         color: var(--ink);
-        display: flex;
-        align-items: center;
-        gap: 10px;
         font-weight: 600;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
       }
       .step {
         background: var(--bg-elevated);
@@ -69,44 +64,34 @@
         border-left: 3px solid var(--primary);
         padding: 24px;
         margin: 16px 0;
-        border-radius: 0 var(--radius) var(--radius) 0;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .step:hover {
-        background: rgba(6, 182, 212, 0.03);
-        border-color: var(--line-strong);
-        transform: translateX(3px);
-      }
-      .step-number {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: var(--gradient-primary);
-        color: #ffffff;
-        font-weight: 700;
-        font-size: 13px;
-        margin-right: 10px;
-        box-shadow: 0 4px 15px var(--primary-glow);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
       }
       .step-title {
         font-weight: 600;
         font-size: 15px;
         color: var(--ink);
-        margin-bottom: 8px;
+        margin-bottom: 10px;
       }
       .step p {
         color: var(--muted);
         margin-bottom: 12px;
         font-size: 14px;
+        line-height: 1.6;
+      }
+      .step ul {
+        margin: 8px 0 12px 20px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .step li {
+        margin-bottom: 6px;
       }
       .code-block {
         background: #0a0f1a;
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-sm);
-        padding: 20px;
+        padding: 18px;
         overflow-x: auto;
         margin: 14px 0;
       }
@@ -115,24 +100,25 @@
         font-size: 13px;
         line-height: 1.6;
         font-family: "JetBrains Mono", monospace;
+        white-space: pre;
+        display: block;
       }
-      .code-block code .highlight {
-        color: var(--primary-light);
-      }
-      .warning {
-        background: var(--warning-bg);
-        border: 1px solid var(--warning-border);
-        border-radius: var(--radius-sm);
-        padding: 16px 20px;
+      .info-box {
+        background: var(--bg-elevated);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--primary);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        padding: 18px 22px;
         margin: 20px 0;
       }
-      .warning strong {
-        color: var(--warning);
-      }
-      .warning p {
-        color: var(--ink);
+      .info-box p {
+        color: var(--muted);
         margin: 0;
         font-size: 14px;
+        line-height: 1.6;
+      }
+      .info-box strong {
+        color: var(--ink);
       }
       .faq-item {
         background: var(--bg-elevated);
@@ -140,12 +126,6 @@
         border-radius: var(--radius);
         padding: 20px;
         margin-bottom: 14px;
-        transition: all 0.2s ease;
-      }
-      .faq-item:hover {
-        border-color: var(--line-strong);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow);
       }
       .faq-item h3 {
         font-size: 15px;
@@ -167,6 +147,21 @@
       .faq-item li {
         margin-bottom: 5px;
       }
+      .model-list {
+        display: inline-flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 4px 0;
+      }
+      .model-tag {
+        padding: 4px 12px;
+        background: var(--bg-elevated);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--primary);
+      }
       .back-link {
         text-align: center;
         margin-top: 48px;
@@ -177,21 +172,10 @@
         color: var(--muted);
         text-decoration: none;
         font-size: 14px;
-        transition: color 0.2s;
         font-weight: 500;
       }
       .back-link a:hover {
-        color: var(--primary-light);
-      }
-      .link {
-        color: var(--primary-light);
-        text-decoration: none;
-        transition: color 0.2s;
-        font-weight: 500;
-      }
-      .link:hover {
         color: var(--primary);
-        text-decoration: underline;
       }
     </style>
   </head>
@@ -199,132 +183,136 @@
     <div class="standalone-wrapper">
       <div class="standalone-card">
         <div class="faq-header">
-          <h1>FAQ</h1>
-          <p>Гайд по использованию Aether endpoint</p>
+          <h1>Инструкция по подключению</h1>
+          <p>Как использовать Aether endpoint с Claude Code CLI</p>
         </div>
 
-            <div class="section">
-              <h2>Ваш Endpoint</h2>
-              <p style="text-align: center;">
-                Base URL: <code class="endpoint-url" id="endpointUrl">...</code>
-              </p>
+        <div class="section">
+          <h2>Ваш endpoint</h2>
+          <p style="text-align: center; margin-bottom: 8px;">
+            <code class="endpoint-url" id="endpointUrl">...</code>
+          </p>
+          <p style="text-align: center; color: var(--muted); font-size: 13px;">
+            Этот URL нужен для настройки Claude Code CLI
+          </p>
+        </div>
+
+        <div class="section">
+          <h2>Шаг 1: Получите API ключ</h2>
+          <div class="step">
+            <p>Для начала работы вам нужен кастомный API ключ:</p>
+            <ul>
+              <li>Откройте главную страницу <a href="/" style="color: var(--primary);">Aether</a></li>
+              <li>Войдите в админ-панель, используя пароль администратора</li>
+              <li>Перейдите на вкладку "Выдать ключ"</li>
+              <li>Введите название (например, "ClaudeCode" или ваше имя)</li>
+              <li>Нажмите "Создать ключ"</li>
+              <li>Скопируйте полученный ключ (начинается с <code>sk-</code>)</li>
+            </ul>
+            <p>Этот ключ привязан к вашему балансу кредитов. Каждый запрос будет расходовать кредиты.</p>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Шаг 2: Установите Claude Code CLI</h2>
+          <div class="step">
+            <p>Если Claude Code CLI еще не установлен:</p>
+            <div class="code-block">
+              <code>npm install -g @anthropic-ai/claude-code</code>
+            </div>
+            <p>После установки убедитесь, что команда доступна:</p>
+            <div class="code-block">
+              <code>claude --version</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Шаг 3: Настройте переменные окружения</h2>
+          <div class="step">
+            <p>Claude Code CLI использует переменные окружения <code>ANTHROPIC_API_KEY</code> и <code>ANTHROPIC_BASE_URL</code>. Вам нужно задать их перед каждым запуском или добавить в профиль shell.</p>
+
+            <p><strong>Для Linux/Mac (bash/zsh):</strong></p>
+            <div class="code-block">
+              <code>export ANTHROPIC_API_KEY="ваш-скопированный-ключ"
+export ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"</code>
             </div>
 
-            <div class="section">
-              <h2>Как подключить Claude Code CLI</h2>
-
-              <div class="step">
-                <span class="step-number">1</span>
-                <div>
-                  <div class="step-title">Установите Claude Code CLI</div>
-                  <p>Скачайте и установите Claude Code CLI:</p>
-                  <div class="code-block">
-                    <code>npm install -g @anthropic-ai/claude-code</code>
-                  </div>
-                </div>
-              </div>
-
-              <div class="step">
-                <span class="step-number">2</span>
-                <div>
-                  <div class="step-title">Настройте Claude Code CLI</div>
-                  <p>Используйте ваш кастомный API ключ и Base URL:</p>
-                  <div class="code-block">
-                    <code># Linux/Mac
-export ANTHROPIC_API_KEY="ваш-кастомный-ключ"
-export ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"
-
-# Windows PowerShell
-$env:ANTHROPIC_API_KEY="ваш-кастомный-ключ"
-$env:ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"</code>
-                  </div>
-                </div>
-              </div>
-
-              <div class="step">
-                <span class="step-number">3</span>
-                <div>
-                  <div class="step-title">Запустите Claude Code CLI</div>
-                  <p>Теперь вы можете запустить Claude Code CLI:</p>
-                  <div class="code-block">
-                    <code>claude-code</code>
-                  </div>
-                </div>
-              </div>
+            <p><strong>Для Windows (PowerShell):</strong></p>
+            <div class="code-block">
+              <code>$env:ANTHROPIC_API_KEY = "ваш-скопированный-ключ"
+$env:ANTHROPIC_BASE_URL = "<span class="base-url-placeholder">...</span>"</code>
             </div>
 
-            <div class="section">
-              <h2>Использование с OpenAI SDK</h2>
-              <p>Вы также можете использовать стандартный OpenAI SDK:</p>
-              <div class="code-block">
-                <code>import OpenAI from "openai";
+            <p><strong>Для постоянной настройки</strong> добавьте export-строки в файл <code>~/.bashrc</code>, <code>~/.zshrc</code> или <code>~/.profile</code> (Mac/Linux). На Windows добавьте через "Переменные среды" в настройках системы.</p>
+          </div>
+        </div>
 
-const client = new OpenAI({
-  baseURL: "<span class="base-url-placeholder">...</span>",
-  apiKey: "ваш-кастомный-ключ",
-});
-
-const response = await client.chat.completions.create({
-  model: "claude-opus-4-7",
-  messages: [{ role: "user", content: "Hello" }],
-});
-
-console.log(response.choices[0].message.content);</code>
-              </div>
+        <div class="section">
+          <h2>Шаг 4: Запустите Claude Code</h2>
+          <div class="step">
+            <p>После настройки переменных запустите:</p>
+            <div class="code-block">
+              <code>claude</code>
             </div>
-
-            <div class="section">
-              <h2>Использование с curl</h2>
-              <div class="code-block">
-                <code>curl <span class="base-url-placeholder">...</span>/chat/completions \
-  -H "Authorization: Bearer ваш-кастомный-ключ" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"claude-opus-4-7","messages":[{"role":"user","content":"Hello"}]}'</code>
-              </div>
+            <p>Или для запуска в конкретной директории:</p>
+            <div class="code-block">
+              <code>claude /path/to/your/project</code>
             </div>
+            <p>Claude Code CLI автоматически подключится к вашему endpoint через <code>ANTHROPIC_BASE_URL</code>.</p>
+          </div>
+        </div>
 
-            <div class="section">
-              <h2>Дополнительные команды</h2>
-              <ul style="color: var(--muted); margin-left: 20px;">
-                <li><code>claude-code --help</code> - показать справку по командам</li>
-                <li><code>claude-code --model claude-opus-4-7</code> - указать модель</li>
-                <li><code>claude-code --stream</code> - включить стриминг ответов</li>
-              </ul>
+        <div class="section">
+          <h2>Доступные модели</h2>
+          <div class="info-box">
+            <p>Наш endpoint поддерживает только две модели:</p>
+            <div class="model-list">
+              <span class="model-tag">claude-opus-4-7</span>
+              <span class="model-tag">glm-5.1</span>
             </div>
+            <p style="margin-top: 8px;">Запросы к другим моделям будут отклонены. По умолчанию используется <code>claude-opus-4-7</code>.</p>
+          </div>
+          <p style="color: var(--muted); font-size: 14px; margin-top: 12px;">Чтобы явно указать модель, используйте флаг <code>--model</code>:</p>
+          <div class="code-block">
+            <code>claude --model claude-opus-4-7</code>
+          </div>
+        </div>
 
-            <div class="section">
-              <h2>Проверка баланса</h2>
-              <p>Вы можете проверить баланс вашего API ключа на странице <a href="/balance" class="link">/balance</a>.</p>
-            </div>
+        <div class="section">
+          <h2>Проверка баланса</h2>
+          <div class="info-box">
+            <p>Вы можете проверить оставшийся баланс кредитов вашего ключа на странице <a href="/balance" style="color: var(--primary);">/balance</a>. Введите ваш API ключ и нажмите "Проверить баланс".</p>
+          </div>
+        </div>
 
-            <div class="section">
-              <h2>Часто задаваемые вопросы</h2>
+        <div class="section">
+          <h2>Часто задаваемые вопросы</h2>
 
-              <div class="faq-item">
-                <h3>Почему я получаю ошибку "Invalid token"?</h3>
-                <p>Убедитесь, что:</p>
-                <ul>
-                  <li>Вы используете кастомный API ключ, созданный на этом endpoint</li>
-                  <li>Ключ скопирован полностью без лишних пробелов</li>
-                  <li>Сервер endpoint доступен</li>
-                </ul>
-              </div>
+          <div class="faq-item">
+            <h3>Почему я получаю ошибку "Invalid token"?</h3>
+            <ul>
+              <li>Убедитесь, что вы используете кастомный API ключ, созданный на этом endpoint, а не ключ от Anthropic</li>
+              <li>Ключ должен быть скопирован полностью, без пробелов в начале или конце</li>
+              <li>Проверьте, что <code>ANTHROPIC_BASE_URL</code> указывает на правильный endpoint</li>
+            </ul>
+          </div>
 
-              <div class="faq-item">
-                <h3>Как изменить модель?</h3>
-                <p>Вы можете указать модель через флаг <code>--model</code> или в конфигурационном файле. Доступные модели: <code>claude-opus-4-7</code>, <code>claude-sonnet-4-5</code> и другие.</p>
-              </div>
+          <div class="faq-item">
+            <h3>Что делать если закончились кредиты?</h3>
+            <p>Свяжитесь с администратором endpoint для пополнения баланса вашего ключа. В админ-панели можно создать новый ключ или увеличить лимит существующего.</p>
+          </div>
 
-              <div class="faq-item">
-                <h3>Сколько кредитов тратится?</h3>
-                <p>Кредиты тратятся в зависимости от количества токенов в запросе и ответе. Вы можете проверить текущий баланс на странице /balance.</p>
-              </div>
+          <div class="faq-item">
+            <h3>Как работает списание кредитов?</h3>
+            <p>С каждого запроса списывается количество кредитов, пропорциональное количеству токенов в запросе и ответе. Подробная информация о расходе доступна после каждого ответа.</p>
+          </div>
 
-              <div class="faq-item">
-                <h3>Как увеличить лимит кредитов?</h3>
-                <p>Свяжитесь с администратором endpoint для увеличения лимита кредитов на вашем ключе.</p>
-              </div>
-            </div>
+          <div class="faq-item">
+            <h3>Можно ли использовать endpoint без Claude Code CLI?</h3>
+            <p>Да. Endpoint поддерживает стандартный OpenAI-compatible API. Вы можете использовать любой клиент, который позволяет задать <code>baseURL</code> и <code>apiKey</code>, например OpenAI SDK, HTTP-клиенты или другие инструменты.</p>
+          </div>
+        </div>
 
         <div class="back-link">
           <a href="/">← Вернуться на главную</a>
@@ -333,11 +321,8 @@ console.log(response.choices[0].message.content);</code>
     </div>
 
     <script>
-      // Auto-detect the current endpoint URL
       const baseUrl = window.location.origin + "/v1";
       document.getElementById("endpointUrl").textContent = baseUrl;
-      
-      // Update all placeholders with the actual base URL
       document.querySelectorAll(".base-url-placeholder").forEach(el => {
         el.textContent = baseUrl;
       });
