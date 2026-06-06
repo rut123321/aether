@@ -48,7 +48,7 @@
             <span>Base URL</span>
             <code id="localBaseUrl">...</code>
             <button class="icon-button" type="button" data-copy-target="localBaseUrl" aria-label="Скопировать Base URL">
-              <span aria-hidden="true">⧉</span>
+              Коп
             </button>
           </div>
         </aside>
@@ -108,6 +108,18 @@
                 <button class="primary-button" type="submit">Создать ключ</button>
               </form>
 
+              <form id="addCreditsForm" class="key-form" style="margin-top: 24px;">
+                <label>
+                  Ключ (полный sk-...)
+                  <input id="addCreditsKey" name="addCreditsKey" type="text" placeholder="sk-..." required />
+                </label>
+                <label>
+                  Добавить кредитов
+                  <input id="addCreditsAmount" name="addCreditsAmount" type="number" min="1" value="100000000" required />
+                </label>
+                <button class="secondary-button" type="submit">Добавить кредиты</button>
+              </form>
+
               <div class="keys-list" id="customKeysList">
                 <p>Загрузка ключей...</p>
               </div>
@@ -158,7 +170,7 @@
                     <h3>Result</h3>
                   </div>
                   <button class="icon-button" type="button" data-copy-target="responseOutput" aria-label="Скопировать ответ">
-                    <span aria-hidden="true">⧉</span>
+                    Коп
                   </button>
                 </div>
                 <pre id="responseOutput">Выбери ключ и отправь тестовый запрос.</pre>

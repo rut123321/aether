@@ -32,6 +32,9 @@ const elements = {
   createKeyForm: document.querySelector("#createKeyForm"),
   newKeyName: document.querySelector("#newKeyName"),
   newKeyCredits: document.querySelector("#newKeyCredits"),
+  addCreditsForm: document.querySelector("#addCreditsForm"),
+  addCreditsKey: document.querySelector("#addCreditsKey"),
+  addCreditsAmount: document.querySelector("#addCreditsAmount"),
   customKeysList: document.querySelector("#customKeysList"),
   totalKeys: document.querySelector("#totalKeys"),
   totalCredits: document.querySelector("#totalCredits"),
@@ -204,6 +207,11 @@ function bindEvents() {
   elements.createKeyForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     await createCustomKey();
+  });
+
+  elements.addCreditsForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await addCreditsToKey();
   });
 
   document.querySelectorAll("[data-copy-target]").forEach((button) => {
@@ -556,6 +564,36 @@ async function deleteCustomKey(fullKey) {
     });
     if (response.ok) {
       showToast("Ключ удален", "success");
+      await loadCustomKeys();
+      await loadStats();
+    } else {
+      showToast(await readErrorMessage(response), "error");
+    }
+  } catch (error) {
+    showToast(`Ошибка: ${error.message}`, "error");
+  }
+}
+
+async function addCreditsToKey() {
+  const key = elements.addCreditsKey.value.trim();
+  const credits = elements.addCreditsAmount.value;
+
+  if (!key || !credits) {
+    showToast("Заполните все поля", "error");
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/keys/${key}`, {
+      method: "POST",
+      headers: getAdminHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ credits: Number(credits) }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      showToast(`Кредиты добавлены. Новый баланс: ${data.credits.toLocaleString()}`, "success");
+      elements.addCreditsForm.reset();
       await loadCustomKeys();
       await loadStats();
     } else {

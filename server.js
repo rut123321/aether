@@ -189,6 +189,33 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Add credits to existing key
+    if (url.pathname.startsWith("/api/keys/") && req.method === "POST") {
+      const keyToAddCredits = url.pathname.slice("/api/keys/".length);
+      const { credits } = await readJsonBody(req);
+      const creditsToAdd = Number(credits);
+
+      if (!apiKeys[keyToAddCredits]) {
+        sendJson(res, 404, { error: "Key not found" });
+        return;
+      }
+
+      if (!Number.isFinite(creditsToAdd) || creditsToAdd <= 0) {
+        sendJson(res, 400, { error: "Credits must be a positive number" });
+        return;
+      }
+
+      apiKeys[keyToAddCredits].credits += Math.floor(creditsToAdd);
+      await saveKeys();
+      sendJson(res, 200, {
+        message: "Credits added",
+        key: keyToAddCredits,
+        name: apiKeys[keyToAddCredits].name,
+        credits: apiKeys[keyToAddCredits].credits,
+      });
+      return;
+    }
+
     if (url.pathname === "/api/balance" && req.method === "POST") {
       const { key } = await readJsonBody(req);
       if (apiKeys[key]) {
