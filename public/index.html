@@ -56,6 +56,19 @@
               </div>
             </div>
 
+            <form id="adminTokenForm" class="key-form admin-token-form" autocomplete="off">
+              <label>
+                Admin token
+                <input id="adminTokenInput" name="adminTokenInput" type="password" placeholder="ADMIN_TOKEN для публичного деплоя" />
+              </label>
+              <button class="secondary-button" type="submit">Сохранить</button>
+              <button class="danger-button" id="clearAdminTokenButton" type="button">Сбросить</button>
+            </form>
+
+            <div class="notice" id="adminTokenNotice">
+              На публичном деплое API управления ключами требует ADMIN_TOKEN.
+            </div>
+
             <form id="createKeyForm" class="key-form">
               <label>
                 Название

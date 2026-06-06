@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: aether-agentrouter-endpoint
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: AGENTROUTER_API_KEY
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: AGENTROUTER_RELAY_KEY
+        sync: false
+      - key: AGENTROUTER_CLIENT_PROFILE
+        value: codex
+      - key: UPSTREAM_WAF_RETRY
+        value: true
+      - key: UPSTREAM_USER_AGENT
+        value: AetherEndpoint/1.0

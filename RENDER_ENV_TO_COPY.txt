@@ -1,0 +1,21 @@
+﻿Render/Railway Environment Variables
+====================================
+
+AGENTROUTER_BASE_URL=https://agentrouter-relay.murofixbhop.workers.dev/v1
+AGENTROUTER_RELAY_KEY=relay-520a17c8b80c47da9307bba5b760a098a8fd7845ed3443f2a5c431a7b8fdc9aa
+AGENTROUTER_API_KEY=sk-kF8BrnidjKOC0r0I2nRAegn3ZZ9vkalBgbR3tjUS5v9UEd76
+AGENTROUTER_CLIENT_PROFILE=codex
+UPSTREAM_WAF_RETRY=true
+UPSTREAM_USER_AGENT=AetherEndpoint/1.0
+ADMIN_TOKEN=CHANGE_ME_TO_ANY_LONG_SECRET
+
+Build Command:
+npm install
+
+Start Command:
+npm start
+
+Important:
+- Do not commit this file publicly: it contains secrets.
+- Set ADMIN_TOKEN to any long password in Render/Railway.
+- After deploy, open the site, enter ADMIN_TOKEN in the panel, create endpoint keys, and use /v1 as base URL.

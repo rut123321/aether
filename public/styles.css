@@ -244,6 +244,14 @@ code {
   align-items: end;
 }
 
+.admin-token-form {
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+}
+
+.admin-token-form + .notice {
+  margin-bottom: 18px;
+}
+
 label {
   display: grid;
   gap: 7px;

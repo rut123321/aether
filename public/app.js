@@ -1,6 +1,7 @@
 const STORAGE_KEYS = {
   keys: "agentrouter-endpoint.keys",
   activeId: "agentrouter-endpoint.activeId",
+  adminToken: "agentrouter-endpoint.adminToken",
 };
 
 const elements = {
@@ -18,6 +19,10 @@ const elements = {
   streamInput: document.querySelector("#streamInput"),
   testKeySelect: document.querySelector("#testKeySelect"),
   responseOutput: document.querySelector("#responseOutput"),
+  adminTokenForm: document.querySelector("#adminTokenForm"),
+  adminTokenInput: document.querySelector("#adminTokenInput"),
+  clearAdminTokenButton: document.querySelector("#clearAdminTokenButton"),
+  adminTokenNotice: document.querySelector("#adminTokenNotice"),
   createKeyForm: document.querySelector("#createKeyForm"),
   newKeyName: document.querySelector("#newKeyName"),
   newKeyCredits: document.querySelector("#newKeyCredits"),
@@ -29,6 +34,8 @@ const elements = {
 
 let keys = loadKeys();
 let activeId = localStorage.getItem(STORAGE_KEYS.activeId) || keys[0]?.id || "";
+let requiresAdminToken = false;
+let allowsDirectUpstreamKeys = false;
 
 boot();
 
@@ -43,6 +50,34 @@ async function boot() {
 }
 
 function bindEvents() {
+  elements.adminTokenInput.value = getAdminToken();
+
+  elements.adminTokenForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const token = elements.adminTokenInput.value.trim();
+
+    if (token) {
+      localStorage.setItem(STORAGE_KEYS.adminToken, token);
+      showToast("Admin token сохранен", "success");
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.adminToken);
+      showToast("Admin token очищен", "success");
+    }
+
+    await loadCustomKeys();
+    await loadStats();
+    renderAdminTokenNotice();
+  });
+
+  elements.clearAdminTokenButton.addEventListener("click", async () => {
+    localStorage.removeItem(STORAGE_KEYS.adminToken);
+    elements.adminTokenInput.value = "";
+    showToast("Admin token очищен", "success");
+    await loadCustomKeys();
+    await loadStats();
+    renderAdminTokenNotice();
+  });
+
   elements.keyForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
@@ -144,6 +179,11 @@ async function sendChatRequest() {
     if (testKey) {
       headers["authorization"] = `Bearer ${testKey}`;
     } else {
+      if (!allowsDirectUpstreamKeys) {
+        showOutput("Прямой AgentRouter API key отключен на этом хосте. Выбери кастомный endpoint-ключ для теста.");
+        return;
+      }
+
       const activeKey = getActiveKey();
       if (!activeKey) {
         showOutput("Добавь AgentRouter API key или выбери кастомный ключ для теста.");
@@ -251,12 +291,16 @@ async function checkServer() {
     const response = await fetch("/api/health");
     if (!response.ok) throw new Error("Health check failed");
     const data = await response.json();
+    requiresAdminToken = Boolean(data.requiresAdminToken);
+    allowsDirectUpstreamKeys = Boolean(data.allowsDirectUpstreamKeys);
     elements.serverStatus.classList.toggle("ok", data.ok);
     elements.serverStatus.lastChild.textContent = data.ok ? "Онлайн" : "Ошибка";
+    renderAdminTokenNotice();
   } catch (error) {
     console.error("Health check error:", error);
     elements.serverStatus.classList.remove("ok");
     elements.serverStatus.lastChild.textContent = "Офлайн";
+    renderAdminTokenNotice();
   }
 }
 
@@ -322,9 +366,53 @@ function showOutput(value) {
   elements.responseOutput.textContent = value;
 }
 
+function getAdminToken() {
+  return localStorage.getItem(STORAGE_KEYS.adminToken) || "";
+}
+
+function getAdminHeaders(extraHeaders = {}) {
+  const token = getAdminToken();
+  const headers = { ...extraHeaders };
+
+  if (token) {
+    headers["x-admin-token"] = token;
+  }
+
+  return headers;
+}
+
+function renderAdminTokenNotice() {
+  const hasToken = Boolean(getAdminToken());
+
+  if (requiresAdminToken && !hasToken) {
+    elements.adminTokenNotice.textContent =
+      "На этом хосте нужен ADMIN_TOKEN. Введи его, чтобы создавать и удалять кастомные ключи.";
+    return;
+  }
+
+  if (requiresAdminToken && hasToken) {
+    elements.adminTokenNotice.textContent =
+      "Admin token сохранен в этом браузере и будет отправляться только в API управления ключами.";
+    return;
+  }
+
+  elements.adminTokenNotice.textContent =
+    "Локально токен не обязателен. На публичном деплое задай ADMIN_TOKEN в переменных окружения.";
+}
+
 async function loadCustomKeys() {
   try {
-    const response = await fetch("/api/keys");
+    const response = await fetch("/api/keys", {
+      headers: getAdminHeaders(),
+    });
+    if (response.status === 401) {
+      elements.customKeysList.innerHTML = "<p>Введите ADMIN_TOKEN, чтобы загрузить ключи.</p>";
+      elements.testKeySelect.innerHTML = renderDefaultTestOption();
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
     const data = await response.json();
     renderCustomKeys(data.keys);
   } catch (error) {
@@ -335,27 +423,35 @@ async function loadCustomKeys() {
 function renderCustomKeys(keys) {
   if (!keys || keys.length === 0) {
     elements.customKeysList.innerHTML = "<p>Нет созданных ключей</p>";
-    elements.testKeySelect.innerHTML = '<option value="">Без ключа (использовать AgentRouter ключ)</option>';
+    elements.testKeySelect.innerHTML = renderDefaultTestOption();
     return;
   }
 
   elements.customKeysList.innerHTML = keys.map((key) => `
     <div class="key-item">
       <div class="key-info">
-        <strong>${key.name}</strong>
-        <code>${key.key}</code>
-        <span>Кредиты: ${key.credits}</span>
+        <strong>${escapeHtml(key.name)}</strong>
+        <code>${escapeHtml(key.key)}</code>
+        <span>Кредиты: ${escapeHtml(key.credits)}</span>
       </div>
       <div class="key-actions">
-        <button class="icon-button" onclick="copyToClipboard('${key.fullKey}')" title="Копировать">⧉</button>
-        <button class="danger-button" onclick="deleteCustomKey('${key.fullKey}')" title="Удалить">✕</button>
+        <button class="icon-button" onclick="copyToClipboard('${escapeAttribute(key.fullKey)}')" title="Копировать">⧉</button>
+        <button class="danger-button" onclick="deleteCustomKey('${escapeAttribute(key.fullKey)}')" title="Удалить">✕</button>
       </div>
     </div>
   `).join("");
 
   // Update test key select dropdown
-  elements.testKeySelect.innerHTML = '<option value="">Без ключа (использовать AgentRouter ключ)</option>' +
-    keys.map((key) => `<option value="${key.fullKey}">${key.name} (${key.credits} кредитов)</option>`).join("");
+  elements.testKeySelect.innerHTML = renderDefaultTestOption() +
+    keys.map((key) => `<option value="${escapeAttribute(key.fullKey)}">${escapeHtml(key.name)} (${escapeHtml(key.credits)} кредитов)</option>`).join("");
+}
+
+function renderDefaultTestOption() {
+  const label = allowsDirectUpstreamKeys
+    ? "Без ключа (использовать AgentRouter ключ)"
+    : "Выбери кастомный endpoint-ключ";
+
+  return `<option value="">${escapeHtml(label)}</option>`;
 }
 
 async function createCustomKey() {
@@ -370,7 +466,7 @@ async function createCustomKey() {
   try {
     const response = await fetch("/api/keys", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: getAdminHeaders({ "content-type": "application/json" }),
       body: JSON.stringify({ name, credits }),
     });
 
@@ -381,7 +477,7 @@ async function createCustomKey() {
       await loadCustomKeys();
       await loadStats();
     } else {
-      showToast("Ошибка создания ключа", "error");
+      showToast(await readErrorMessage(response), "error");
     }
   } catch (error) {
     showToast(`Ошибка: ${error.message}`, "error");
@@ -392,13 +488,16 @@ async function deleteCustomKey(fullKey) {
   if (!confirm("Удалить этот ключ?")) return;
 
   try {
-    const response = await fetch(`/api/keys/${fullKey}`, { method: "DELETE" });
+    const response = await fetch(`/api/keys/${fullKey}`, {
+      method: "DELETE",
+      headers: getAdminHeaders(),
+    });
     if (response.ok) {
       showToast("Ключ удален", "success");
       await loadCustomKeys();
       await loadStats();
     } else {
-      showToast("Ошибка удаления", "error");
+      showToast(await readErrorMessage(response), "error");
     }
   } catch (error) {
     showToast(`Ошибка: ${error.message}`, "error");
@@ -439,7 +538,21 @@ function initTabs() {
 // Load statistics
 async function loadStats() {
   try {
-    const response = await fetch("/api/stats");
+    const response = await fetch("/api/stats", {
+      headers: getAdminHeaders(),
+    });
+
+    if (response.status === 401) {
+      elements.totalKeys.textContent = "—";
+      elements.totalCredits.textContent = "—";
+      elements.activeKeys.textContent = "—";
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
     const data = await response.json();
 
     elements.totalKeys.textContent = data.totalKeys || 0;
@@ -458,6 +571,28 @@ function formatNumber(num) {
     return (num / 1000).toFixed(1) + "K";
   }
   return num.toString();
+}
+
+async function readErrorMessage(response) {
+  try {
+    const data = await response.json();
+    return data.error?.message || data.error || `HTTP ${response.status}`;
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
 // Toast notifications

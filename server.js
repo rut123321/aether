@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
@@ -30,17 +31,27 @@ async function saveKeys() {
 }
 
 function generateApiKey() {
-  return "sk-" + Array.from({ length: 32 }, () => 
-    Math.random().toString(36)[2]).join("");
+  return `sk-${randomBytes(32).toString("hex")}`;
 }
 
 const PORT = Number(process.env.PORT || 3000);
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
+const MAX_REQUEST_BYTES = readPositiveIntegerEnv(
+  "MAX_REQUEST_BYTES",
+  20 * 1024 * 1024,
+);
 const AGENTROUTER_BASE_URL = stripTrailingSlash(
   process.env.AGENTROUTER_BASE_URL || "https://agentrouter.org/v1",
 );
 const DEFAULT_AGENTROUTER_API_KEY = process.env.AGENTROUTER_API_KEY || "";
 const PROXY_SHARED_KEY = process.env.PROXY_SHARED_KEY || "";
-const AGENTROUTER_CLIENT_PROFILE = process.env.AGENTROUTER_CLIENT_PROFILE || "codex";
+const AGENTROUTER_RELAY_KEY = process.env.AGENTROUTER_RELAY_KEY || "";
+const UPSTREAM_WAF_RETRY = process.env.UPSTREAM_WAF_RETRY !== "false";
+const UPSTREAM_USER_AGENT =
+  process.env.UPSTREAM_USER_AGENT || "AetherEndpoint/1.0";
+const ALLOW_DIRECT_UPSTREAM_KEYS = process.env.ALLOW_DIRECT_UPSTREAM_KEYS === "true";
+const ALLOW_SERVER_KEY_PROXY = process.env.ALLOW_SERVER_KEY_PROXY === "true";
+const AGENTROUTER_CLIENT_PROFILE = process.env.AGENTROUTER_CLIENT_PROFILE || "none";
 const CODEX_COMPAT_VERSION = process.env.AGENTROUTER_CODEX_VERSION || "0.101.0";
 const CODEX_COMPAT_USER_AGENT =
   process.env.AGENTROUTER_CODEX_USER_AGENT ||
@@ -78,6 +89,9 @@ const server = createServer(async (req, res) => {
         clientProfile: AGENTROUTER_CLIENT_PROFILE,
         hasServerApiKey: Boolean(DEFAULT_AGENTROUTER_API_KEY),
         requiresProxyKey: Boolean(PROXY_SHARED_KEY),
+        requiresAdminToken: adminAuthRequired(req),
+        allowsDirectUpstreamKeys: canUseDirectUpstreamKeys(req),
+        allowsServerKeyProxy: canUseServerApiKeyFallback(req),
       });
       return;
     }
@@ -89,6 +103,21 @@ const server = createServer(async (req, res) => {
         clientProfile: AGENTROUTER_CLIENT_PROFILE,
         docsUrl: "https://docs.agentrouter.org/",
         tokenUrl: "https://agentrouter.org/console/token",
+        requiresAdminToken: adminAuthRequired(req),
+        allowsDirectUpstreamKeys: canUseDirectUpstreamKeys(req),
+        allowsServerKeyProxy: canUseServerApiKeyFallback(req),
+      });
+      return;
+    }
+
+    if (isAdminApiPath(url.pathname) && !isAuthorizedAdmin(req)) {
+      sendJson(res, 401, {
+        error: {
+          message: "Missing or invalid admin token",
+          hint: ADMIN_TOKEN
+            ? "Send x-admin-token or Authorization: Bearer <ADMIN_TOKEN>."
+            : "Set ADMIN_TOKEN in the deployed service environment.",
+        },
       });
       return;
     }
@@ -107,16 +136,31 @@ const server = createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/keys" && req.method === "POST") {
-      const body = await readRequestBody(req);
-      const { name, credits } = JSON.parse(body.toString());
+      const { name, credits } = await readJsonBody(req);
+      const normalizedName = String(name || "").trim();
+      const normalizedCredits = Number(credits);
+
+      if (!normalizedName || !Number.isFinite(normalizedCredits) || normalizedCredits < 1) {
+        sendJson(res, 400, {
+          error: {
+            message: "Name and positive credits are required",
+          },
+        });
+        return;
+      }
+
       const newKey = generateApiKey();
       apiKeys[newKey] = {
-        name,
-        credits: Number(credits),
+        name: normalizedName,
+        credits: Math.floor(normalizedCredits),
         createdAt: new Date().toISOString(),
       };
       await saveKeys();
-      sendJson(res, 201, { key: newKey, name, credits: apiKeys[newKey].credits });
+      sendJson(res, 201, {
+        key: newKey,
+        name: normalizedName,
+        credits: apiKeys[newKey].credits,
+      });
       return;
     }
 
@@ -133,8 +177,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/balance" && req.method === "POST") {
-      const body = await readRequestBody(req);
-      const { key } = JSON.parse(body.toString());
+      const { key } = await readJsonBody(req);
       if (apiKeys[key]) {
         sendJson(res, 200, { balance: apiKeys[key].credits, name: apiKeys[key].name });
       } else {
@@ -175,10 +218,11 @@ const server = createServer(async (req, res) => {
   } catch (error) {
     console.error(error);
     if (!res.headersSent) {
-      sendJson(res, 500, {
+      const statusCode = Number(error.statusCode) || 500;
+      sendJson(res, statusCode, {
         error: {
-          message: "Internal proxy error",
-          detail: formatError(error),
+          message: statusCode >= 500 ? "Internal proxy error" : error.message,
+          detail: statusCode >= 500 ? formatError(error) : undefined,
         },
       });
     } else {
@@ -205,7 +249,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   }
 
   // Check for custom API key
-  const customApiKey = getHeaderValue(req.headers, "authorization")?.replace("Bearer ", "");
+  const customApiKey = getBearerToken(req.headers);
   let usingCustomKey = false;
   let keyData = null;
 
@@ -224,16 +268,75 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
     }
   }
 
+  const directUpstreamKey = getDirectUpstreamKey(req.headers);
+
+  if (!usingCustomKey && directUpstreamKey && !canUseDirectUpstreamKeys(req)) {
+    sendJson(res, 401, {
+      error: {
+        message: "Direct upstream keys are disabled on public requests",
+        hint: "Use a custom endpoint key, set PROXY_SHARED_KEY, or enable ALLOW_DIRECT_UPSTREAM_KEYS=true.",
+      },
+    });
+    return;
+  }
+
+  if (
+    !usingCustomKey &&
+    !directUpstreamKey &&
+    !(DEFAULT_AGENTROUTER_API_KEY && canUseServerApiKeyFallback(req))
+  ) {
+    sendJson(res, 401, {
+      error: {
+        message: "Missing endpoint key",
+        hint: "Send a generated custom key in Authorization: Bearer <key>.",
+      },
+    });
+    return;
+  }
+
+  if (usingCustomKey && !DEFAULT_AGENTROUTER_API_KEY) {
+    sendJson(res, 500, {
+      error: {
+        message: "AGENTROUTER_API_KEY is required to use custom endpoint keys",
+      },
+    });
+    return;
+  }
+
   const upstreamUrl = buildUpstreamUrl(incomingUrl);
-  const headers = buildUpstreamHeaders(req.headers, usingCustomKey);
   const requestBody = canHaveBody(req.method) ? await readRequestBody(req) : undefined;
 
-  const upstreamResponse = await fetch(upstreamUrl, {
-    method: req.method,
-    headers,
-    body: requestBody,
-    redirect: "manual",
-  });
+  const upstreamResult = await fetchUpstreamWithWafRetry(
+    req,
+    upstreamUrl,
+    usingCustomKey,
+    requestBody,
+  );
+
+  if (upstreamResult.wafChallenge) {
+    sendJson(res, 502, {
+      error: {
+        code: "UPSTREAM_WAF_CHALLENGE",
+        message: "AgentRouter returned an Aliyun WAF browser verification page instead of an API response.",
+        hint: "The request reached AgentRouter. Clean API headers and the compatibility retry were both challenged, so this is likely a Render/Railway egress IP block. Ask AgentRouter for allowlist/server-to-server access or use a different outbound IP.",
+        upstreamStatus: upstreamResult.status,
+        upstreamBaseUrl: AGENTROUTER_BASE_URL,
+        attemptedProfiles: upstreamResult.attemptedProfiles,
+      },
+    });
+    return;
+  }
+
+  if (upstreamResult.htmlResponse) {
+    res.writeHead(upstreamResult.status, {
+      "content-type": upstreamResult.contentType || "text/html; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    res.end(upstreamResult.responseText);
+    return;
+  }
+
+  const upstreamResponse = upstreamResult.response;
 
   const responseHeaders = {};
   upstreamResponse.headers.forEach((value, key) => {
@@ -269,7 +372,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       reader.read().then(async function process({ done, value }) {
         if (done) {
           stream.push(null);
-          // Deduct credits (1 credit = 100 tokens)
+          // Deduct credits (100 credits = 1 token)
           const creditsToDeduct = Math.ceil(totalTokens * 100);
           if (creditsToDeduct > 0) {
             apiKeys[customApiKey].credits -= creditsToDeduct;
@@ -321,6 +424,47 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   }
 }
 
+async function fetchUpstreamWithWafRetry(req, upstreamUrl, usingCustomKey, requestBody) {
+  const attemptedProfiles = [];
+  const profiles = buildUpstreamHeaderProfiles();
+
+  for (const profile of profiles) {
+    attemptedProfiles.push(profile);
+    const headers = buildUpstreamHeaders(req, usingCustomKey, profile);
+    const upstreamResponse = await fetch(upstreamUrl, {
+    method: req.method,
+    headers,
+    body: requestBody,
+    redirect: "manual",
+  });
+
+    if (!isHtmlResponse(upstreamResponse)) {
+      return { response: upstreamResponse, attemptedProfiles };
+    }
+
+    const responseText = await upstreamResponse.text();
+    if (!isAliyunWafChallenge(responseText)) {
+      return {
+        htmlResponse: true,
+        status: upstreamResponse.status,
+        contentType: upstreamResponse.headers.get("content-type"),
+        responseText,
+        attemptedProfiles,
+      };
+    }
+
+    if (!UPSTREAM_WAF_RETRY) {
+      break;
+    }
+  }
+
+  return {
+    wafChallenge: true,
+    status: 200,
+    attemptedProfiles,
+  };
+}
+
 function buildUpstreamUrl(incomingUrl) {
   const proxyPath = incomingUrl.pathname.startsWith("/api/proxy/v1")
     ? incomingUrl.pathname.replace(/^\/api\/proxy\/v1/, "")
@@ -330,32 +474,43 @@ function buildUpstreamUrl(incomingUrl) {
   return `${pathname}${incomingUrl.search}`;
 }
 
-function buildUpstreamHeaders(incomingHeaders, usingCustomKey = false) {
+function buildUpstreamHeaderProfiles() {
+  const profiles = [AGENTROUTER_CLIENT_PROFILE];
+
+  if (UPSTREAM_WAF_RETRY && !profiles.includes("codex")) {
+    profiles.push("codex");
+  }
+
+  return profiles;
+}
+
+function buildUpstreamHeaders(req, usingCustomKey = false, clientProfile = AGENTROUTER_CLIENT_PROFILE) {
+  const incomingHeaders = req.headers;
   const headers = {};
 
   for (const [key, value] of Object.entries(incomingHeaders)) {
     const lowerKey = key.toLowerCase();
-    if (shouldSkipRequestHeader(lowerKey)) {
+    if (!shouldForwardRequestHeader(lowerKey)) {
       continue;
     }
 
     headers[lowerKey] = Array.isArray(value) ? value.join(", ") : value;
   }
 
-  // If using custom key, always use the default AgentRouter API key for upstream
-  // Otherwise, check for browser-provided key
+  // Custom endpoint keys are backed by the server AgentRouter key.
+  // Plain public proxy fallback is disabled unless explicitly allowed.
   if (usingCustomKey) {
     if (DEFAULT_AGENTROUTER_API_KEY) {
       headers.authorization = `Bearer ${DEFAULT_AGENTROUTER_API_KEY}`;
     }
   } else {
-    const browserSelectedKey =
-      getHeaderValue(incomingHeaders, "x-agentrouter-key") ||
-      getHeaderValue(incomingHeaders, "x-agentrouter-api-key");
+    const directUpstreamKey = canUseDirectUpstreamKeys(req)
+      ? getDirectUpstreamKey(incomingHeaders)
+      : "";
 
-    if (browserSelectedKey) {
-      headers.authorization = `Bearer ${browserSelectedKey}`;
-    } else if (DEFAULT_AGENTROUTER_API_KEY) {
+    if (directUpstreamKey) {
+      headers.authorization = `Bearer ${directUpstreamKey}`;
+    } else if (DEFAULT_AGENTROUTER_API_KEY && canUseServerApiKeyFallback(req)) {
       headers.authorization = `Bearer ${DEFAULT_AGENTROUTER_API_KEY}`;
     }
   }
@@ -363,40 +518,45 @@ function buildUpstreamHeaders(incomingHeaders, usingCustomKey = false) {
   delete headers["x-agentrouter-key"];
   delete headers["x-agentrouter-api-key"];
   delete headers["x-proxy-key"];
+  delete headers["x-relay-key"];
 
-  applyClientProfile(headers);
+  if (AGENTROUTER_RELAY_KEY) {
+    headers["x-relay-key"] = AGENTROUTER_RELAY_KEY;
+  }
+
+  applyApiHeaderProfile(headers);
+  applyClientProfile(headers, clientProfile);
 
   return headers;
 }
 
-function applyClientProfile(headers) {
-  if (AGENTROUTER_CLIENT_PROFILE === "none") {
+function applyApiHeaderProfile(headers) {
+  headers.accept = "application/json, text/event-stream";
+  headers["user-agent"] = UPSTREAM_USER_AGENT;
+}
+
+function applyClientProfile(headers, clientProfile = AGENTROUTER_CLIENT_PROFILE) {
+  if (clientProfile === "none") {
     return;
   }
 
-  if (AGENTROUTER_CLIENT_PROFILE === "codex") {
+  if (clientProfile === "codex") {
     headers.originator = "codex_cli_rs";
     headers["user-agent"] = CODEX_COMPAT_USER_AGENT;
     headers.version = CODEX_COMPAT_VERSION;
   }
 }
 
-function shouldSkipRequestHeader(key) {
+function shouldForwardRequestHeader(key) {
   return [
-    "host",
-    "connection",
-    "content-length",
-    "expect",
-    "accept-encoding",
-    "origin",
-    "referer",
-    "sec-fetch-dest",
-    "sec-fetch-mode",
-    "sec-fetch-site",
-    "sec-ch-ua",
-    "sec-ch-ua-mobile",
-    "sec-ch-ua-platform",
-  ].includes(key);
+    "authorization",
+    "content-type",
+    "openai-organization",
+    "openai-project",
+    "idempotency-key",
+    "anthropic-version",
+    "anthropic-beta",
+  ].includes(key) || key.startsWith("anthropic-");
 }
 
 function shouldSkipResponseHeader(key) {
@@ -407,6 +567,18 @@ function shouldSkipResponseHeader(key) {
     "transfer-encoding",
     "keep-alive",
   ].includes(key.toLowerCase());
+}
+
+function isHtmlResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  return contentType.toLowerCase().includes("text/html");
+}
+
+function isAliyunWafChallenge(body) {
+  return body.includes("aliyun_waf_") ||
+    body.includes("AliyunCaptcha") ||
+    body.includes("CF_APP_WAF") ||
+    body.includes('id="renderData"');
 }
 
 function isProxyPath(pathname) {
@@ -420,15 +592,61 @@ function isValidProxyKey(req) {
 }
 
 function safeEqual(a, b) {
-  if (a.length !== b.length) {
+  const first = Buffer.from(String(a));
+  const second = Buffer.from(String(b));
+
+  if (first.length !== second.length) {
     return false;
   }
 
-  let result = 0;
-  for (let index = 0; index < a.length; index += 1) {
-    result |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return timingSafeEqual(first, second);
+}
+
+function isAdminApiPath(pathname) {
+  return pathname === "/api/keys" ||
+    pathname.startsWith("/api/keys/") ||
+    pathname === "/api/stats";
+}
+
+function isAuthorizedAdmin(req) {
+  if (!adminAuthRequired(req)) {
+    return true;
   }
-  return result === 0;
+
+  if (!ADMIN_TOKEN) {
+    return false;
+  }
+
+  const supplied =
+    getHeaderValue(req.headers, "x-admin-token") ||
+    getBearerToken(req.headers);
+
+  return supplied && safeEqual(supplied, ADMIN_TOKEN);
+}
+
+function adminAuthRequired(req) {
+  return Boolean(ADMIN_TOKEN) || !isLocalRequest(req);
+}
+
+function canUseServerApiKeyFallback(req) {
+  return ALLOW_SERVER_KEY_PROXY ||
+    isLocalRequest(req) ||
+    Boolean(PROXY_SHARED_KEY && isValidProxyKey(req));
+}
+
+function canUseDirectUpstreamKeys(req) {
+  return ALLOW_DIRECT_UPSTREAM_KEYS ||
+    isLocalRequest(req) ||
+    Boolean(PROXY_SHARED_KEY && isValidProxyKey(req));
+}
+
+function isLocalRequest(req) {
+  const hostHeader = (req.headers.host || "").toLowerCase();
+  const host = hostHeader.startsWith("[")
+    ? hostHeader.slice(1, hostHeader.indexOf("]"))
+    : hostHeader.split(":")[0];
+
+  return ["localhost", "127.0.0.1", "::1"].includes(host);
 }
 
 async function serveStatic(url, res) {
@@ -472,7 +690,7 @@ function addCorsHeaders(res) {
   res.setHeader("access-control-allow-origin", "*");
   res.setHeader(
     "access-control-allow-headers",
-    "authorization, content-type, x-agentrouter-key, x-agentrouter-api-key, x-proxy-key",
+    "authorization, content-type, x-admin-token, x-agentrouter-key, x-agentrouter-api-key, x-proxy-key",
   );
   res.setHeader(
     "access-control-allow-methods",
@@ -486,6 +704,18 @@ function getHeaderValue(headers, headerName) {
     return value[0];
   }
   return value || "";
+}
+
+function getBearerToken(headers) {
+  const authorization = getHeaderValue(headers, "authorization");
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
+function getDirectUpstreamKey(headers) {
+  return getHeaderValue(headers, "x-agentrouter-key") ||
+    getHeaderValue(headers, "x-agentrouter-api-key") ||
+    getBearerToken(headers);
 }
 
 function stripTrailingSlash(value) {
@@ -505,18 +735,56 @@ function formatError(error) {
   return `${error.message}${cause}`;
 }
 
+async function readJsonBody(req) {
+  const body = await readRequestBody(req);
+
+  try {
+    return JSON.parse(body.toString() || "{}");
+  } catch {
+    throw createHttpError(400, "Invalid JSON body");
+  }
+}
+
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
+    let totalBytes = 0;
+    let settled = false;
 
     req.on("data", (chunk) => {
+      totalBytes += chunk.length;
+
+      if (totalBytes > MAX_REQUEST_BYTES) {
+        settled = true;
+        reject(createHttpError(413, `Request body exceeds ${MAX_REQUEST_BYTES} bytes`));
+        req.destroy();
+        return;
+      }
+
       chunks.push(chunk);
     });
 
     req.on("end", () => {
-      resolve(Buffer.concat(chunks));
+      if (!settled) {
+        resolve(Buffer.concat(chunks));
+      }
     });
 
-    req.on("error", reject);
+    req.on("error", (error) => {
+      if (!settled) {
+        reject(error);
+      }
+    });
   });
+}
+
+function createHttpError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function readPositiveIntegerEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }

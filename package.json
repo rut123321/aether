@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "start:relay": "powershell -ExecutionPolicy Bypass -File ./start-relay.ps1",
     "dev": "node --watch server.js"
   },
   "engines": {
     "node": ">=18.17.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.98.0"
+  }
 }
