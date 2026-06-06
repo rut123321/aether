@@ -36,7 +36,25 @@ function generateApiKey() {
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Murz123";
+
+function generateRandomPassword(length = 16) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+  let result = "";
+  const bytes = randomBytes(length * 2);
+  for (let i = 0; i < length; i++) {
+    result += chars[bytes[i] % chars.length];
+  }
+  return result;
+}
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || generateRandomPassword();
+if (!process.env.ADMIN_PASSWORD) {
+  console.log("=".repeat(60));
+  console.log("WARNING: ADMIN_PASSWORD not set in environment.");
+  console.log(`Generated random admin password: ${ADMIN_PASSWORD}`);
+  console.log("Set ADMIN_PASSWORD env var for a persistent password.");
+  console.log("=".repeat(60));
+}
 const MAX_REQUEST_BYTES = readPositiveIntegerEnv(
   "MAX_REQUEST_BYTES",
   20 * 1024 * 1024,
@@ -72,9 +90,37 @@ const MIME_TYPES = {
   ".webp": "image/webp",
 };
 
+// Rate limiting store (in-memory; cleared on restart)
+const rateLimitStore = new Map();
+
+function checkRateLimit(identifier, maxAttempts = 10, windowMs = 60000) {
+  const now = Date.now();
+  const entry = rateLimitStore.get(identifier);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(identifier, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+
+  entry.count++;
+  if (entry.count > maxAttempts) {
+    return false;
+  }
+  return true;
+}
+
+function getClientIdentifier(req) {
+  const forwarded = getHeaderValue(req.headers, "x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return req.socket.remoteAddress || "unknown";
+}
+
 const server = createServer(async (req, res) => {
   try {
-    addCorsHeaders(res);
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const isAdminPath = isAdminApiPath(url.pathname) || url.pathname === "/api/admin/verify";
+    addCorsHeaders(res, isAdminPath);
+    addSecurityHeaders(res);
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
@@ -82,32 +128,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const clientIp = getClientIdentifier(req);
 
     if (url.pathname === "/api/health") {
-      sendJson(res, 200, {
-        ok: true,
-        upstreamBaseUrl: AGENTROUTER_BASE_URL,
-        clientProfile: AGENTROUTER_CLIENT_PROFILE,
-        hasServerApiKey: Boolean(DEFAULT_AGENTROUTER_API_KEY),
-        requiresProxyKey: Boolean(PROXY_SHARED_KEY),
-        requiresAdminToken: adminAuthRequired(req),
-        allowsDirectUpstreamKeys: canUseDirectUpstreamKeys(req),
-        allowsServerKeyProxy: canUseServerApiKeyFallback(req),
-      });
+      sendJson(res, 200, { ok: true });
       return;
     }
 
     if (url.pathname === "/api/config") {
       sendJson(res, 200, {
         proxyBasePath: "/v1",
-        upstreamBaseUrl: AGENTROUTER_BASE_URL,
-        clientProfile: AGENTROUTER_CLIENT_PROFILE,
         docsUrl: "https://docs.agentrouter.org/",
         tokenUrl: "https://agentrouter.org/console/token",
-        requiresAdminToken: adminAuthRequired(req),
-        allowsDirectUpstreamKeys: canUseDirectUpstreamKeys(req),
-        allowsServerKeyProxy: canUseServerApiKeyFallback(req),
       });
       return;
     }
@@ -126,6 +158,10 @@ const server = createServer(async (req, res) => {
 
     // Admin password verification
     if (url.pathname === "/api/admin/verify" && req.method === "POST") {
+      if (!checkRateLimit(`login:${clientIp}`, 5, 60000)) {
+        sendJson(res, 429, { error: { message: "Too many attempts. Try again in a minute." } });
+        return;
+      }
       const { password } = await readJsonBody(req);
       if (password === ADMIN_PASSWORD) {
         sendJson(res, 200, { success: true });
@@ -139,13 +175,37 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/api/keys" && req.method === "GET") {
       const keysList = Object.entries(apiKeys).map(([key, data]) => ({
         key: key.slice(0, 8) + "..." + key.slice(-4),
-        fullKey: key,
         name: data.name,
         credits: data.credits,
         createdAt: data.createdAt,
       }));
       sendJson(res, 200, { keys: keysList });
       return;
+    }
+
+    if (url.pathname === "/api/keys/reveal" && req.method === "POST") {
+      const { partialKey } = await readJsonBody(req);
+      const normalizedPartial = String(partialKey || "").trim();
+      if (!normalizedPartial.includes("...")) {
+        sendJson(res, 400, { error: { message: "Invalid partial key format" } });
+        return;
+      }
+      const [prefix, suffix] = normalizedPartial.split("...");
+      const matchedKey = Object.keys(apiKeys).find((k) => k.startsWith(prefix) && k.endsWith(suffix));
+      if (matchedKey) {
+        sendJson(res, 200, { fullKey: matchedKey, name: apiKeys[matchedKey].name });
+      } else {
+        sendJson(res, 404, { error: { message: "Key not found" } });
+      }
+      return;
+    }
+
+    // Rate limit key mutations per IP
+    if ((url.pathname === "/api/keys" || url.pathname.startsWith("/api/keys/")) && ["POST", "DELETE"].includes(req.method)) {
+      if (!checkRateLimit(`keys:${clientIp}`, 20, 60000)) {
+        sendJson(res, 429, { error: { message: "Too many requests. Try again later." } });
+        return;
+      }
     }
 
     if (url.pathname === "/api/keys" && req.method === "POST") {
@@ -242,14 +302,20 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === "/balance") {
       const balanceHtml = await readFile(resolve(publicDir, "balance.html"), "utf8");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+      });
       res.end(balanceHtml);
       return;
     }
 
     if (url.pathname === "/faq") {
       const faqHtml = await readFile(resolve(publicDir, "faq.html"), "utf8");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+      });
       res.end(faqHtml);
       return;
     }
@@ -664,6 +730,7 @@ function safeEqual(a, b) {
 function isAdminApiPath(pathname) {
   return pathname === "/api/keys" ||
     pathname.startsWith("/api/keys/") ||
+    pathname === "/api/keys/reveal" ||
     pathname === "/api/stats";
 }
 
@@ -722,7 +789,10 @@ async function serveStatic(url, res) {
   if (!existsSync(filePath)) {
     const fallback = resolve(publicDir, "index.html");
     const html = await readFile(fallback, "utf8");
-    res.writeHead(200, { "content-type": MIME_TYPES[".html"] });
+    res.writeHead(200, {
+      "content-type": MIME_TYPES[".html"],
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+    });
     res.end(html);
     return;
   }
@@ -730,9 +800,15 @@ async function serveStatic(url, res) {
   const contentType = MIME_TYPES[extname(filePath).toLowerCase()] ||
     "application/octet-stream";
 
+  const extraHeaders = {
+    "cache-control": "no-store",
+  };
+  if (contentType === "text/html; charset=utf-8") {
+    extraHeaders["content-security-policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';";
+  }
   res.writeHead(200, {
     "content-type": contentType,
-    "cache-control": "no-store",
+    ...extraHeaders,
   });
   createReadStream(filePath).pipe(res);
 }
@@ -745,8 +821,10 @@ function sendJson(res, statusCode, data) {
   res.end(JSON.stringify(data, null, 2));
 }
 
-function addCorsHeaders(res) {
-  res.setHeader("access-control-allow-origin", "*");
+function addCorsHeaders(res, isAdmin = false) {
+  if (!isAdmin) {
+    res.setHeader("access-control-allow-origin", "*");
+  }
   res.setHeader(
     "access-control-allow-headers",
     "authorization, content-type, x-admin-token, x-agentrouter-key, x-agentrouter-api-key, x-proxy-key",
@@ -755,6 +833,12 @@ function addCorsHeaders(res) {
     "access-control-allow-methods",
     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   );
+}
+
+function addSecurityHeaders(res) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 }
 
 function getHeaderValue(headers, headerName) {

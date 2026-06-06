@@ -5,8 +5,6 @@ const STORAGE_KEYS = {
   loginVerified: "agentrouter-endpoint.loginVerified",
 };
 
-const LOGIN_PASSWORD = "Murz123";
-
 const elements = {
   serverStatus: document.querySelector("#serverStatus"),
   localBaseUrl: document.querySelector("#localBaseUrl"),
@@ -63,20 +61,32 @@ async function boot() {
   initTabs();
 }
 
-function initLogin() {
+async function initLogin() {
   if (localStorage.getItem(STORAGE_KEYS.loginVerified) === "true") {
     elements.loginOverlay.style.display = "none";
     return;
   }
 
-  elements.loginForm.addEventListener("submit", (event) => {
+  elements.loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const password = elements.loginPassword.value.trim();
 
-    if (password === LOGIN_PASSWORD) {
-      localStorage.setItem(STORAGE_KEYS.loginVerified, "true");
-      elements.loginOverlay.style.display = "none";
-    } else {
+    try {
+      const response = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        localStorage.setItem(STORAGE_KEYS.loginVerified, "true");
+        elements.loginOverlay.style.display = "none";
+      } else {
+        elements.loginError.style.display = "block";
+        elements.loginPassword.value = "";
+        elements.loginPassword.focus();
+      }
+    } catch {
       elements.loginError.style.display = "block";
       elements.loginPassword.value = "";
       elements.loginPassword.focus();
@@ -231,7 +241,7 @@ async function sendChatRequest() {
   const model = elements.modelInput.value.trim();
   const message = elements.messageInput.value.trim();
   const stream = elements.streamInput.checked;
-  const testKey = elements.testKeySelect.value;
+  let testKey = elements.testKeySelect.value;
 
   if (!model || !message) {
     showOutput("Model и Message не должны быть пустыми.");
@@ -241,6 +251,11 @@ async function sendChatRequest() {
   showOutput("Отправляю запрос...");
 
   try {
+    // Reveal full key if testKey is a masked partial key
+    if (testKey && testKey.includes("...")) {
+      testKey = await revealKey(testKey);
+    }
+
     const headers = {
       "content-type": "application/json",
     };
@@ -486,7 +501,7 @@ async function loadCustomKeys() {
     const data = await response.json();
     renderCustomKeys(data.keys);
   } catch (error) {
-    elements.customKeysList.innerHTML = `<p>Ошибка загрузки: ${error.message}</p>`;
+    elements.customKeysList.innerHTML = `<p>Ошибка загрузки: ${escapeHtml(error.message)}</p>`;
   }
 }
 
@@ -505,15 +520,22 @@ function renderCustomKeys(keys) {
         <span>Кредиты: ${escapeHtml(key.credits)}</span>
       </div>
       <div class="key-actions">
-        <button class="icon-button" onclick="copyToClipboard('${escapeAttribute(key.fullKey)}')" title="Копировать">Коп</button>
-        <button class="danger-button" onclick="deleteCustomKey('${escapeAttribute(key.fullKey)}')" title="Удалить">Удл</button>
+        <button class="icon-button js-copy" data-partial="${escapeAttribute(key.key)}" title="Копировать">Коп</button>
+        <button class="danger-button js-delete" data-partial="${escapeAttribute(key.key)}" title="Удалить">Удл</button>
       </div>
     </div>
   `).join("");
 
-  // Update test key select dropdown
+  elements.customKeysList.querySelectorAll(".js-copy").forEach((btn) => {
+    btn.addEventListener("click", () => revealAndCopy(btn.dataset.partial));
+  });
+  elements.customKeysList.querySelectorAll(".js-delete").forEach((btn) => {
+    btn.addEventListener("click", () => revealAndDelete(btn.dataset.partial));
+  });
+
+  // Update test key select dropdown (value is partial key; revealed on use)
   elements.testKeySelect.innerHTML = renderDefaultTestOption() +
-    keys.map((key) => `<option value="${escapeAttribute(key.fullKey)}">${escapeHtml(key.name)} (${escapeHtml(key.credits)} кредитов)</option>`).join("");
+    keys.map((key) => `<option value="${escapeAttribute(key.key)}">${escapeHtml(key.name)} (${escapeHtml(key.credits)} кредитов)</option>`).join("");
 }
 
 function renderDefaultTestOption() {
@@ -554,10 +576,32 @@ async function createCustomKey() {
   }
 }
 
-async function deleteCustomKey(fullKey) {
-  if (!confirm("Удалить этот ключ?")) return;
+async function revealKey(partialKey) {
+  const response = await fetch("/api/keys/reveal", {
+    method: "POST",
+    headers: getAdminHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify({ partialKey }),
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+  const data = await response.json();
+  return data.fullKey;
+}
 
+async function revealAndCopy(partialKey) {
   try {
+    const fullKey = await revealKey(partialKey);
+    copyToClipboard(fullKey);
+  } catch (error) {
+    showToast(`Ошибка: ${error.message}`, "error");
+  }
+}
+
+async function revealAndDelete(partialKey) {
+  if (!confirm("Удалить этот ключ?")) return;
+  try {
+    const fullKey = await revealKey(partialKey);
     const response = await fetch(`/api/keys/${fullKey}`, {
       method: "DELETE",
       headers: getAdminHeaders(),
@@ -715,6 +759,5 @@ function createToastContainer() {
   return container;
 }
 
-// Make functions globally available for onclick handlers
-window.deleteCustomKey = deleteCustomKey;
+// Make copyToClipboard globally available for any direct usage
 window.copyToClipboard = copyToClipboard;
