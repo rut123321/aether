@@ -34,6 +34,37 @@ function generateApiKey() {
   return `sk-${randomBytes(32).toString("hex")}`;
 }
 
+// Session management
+const SESSION_SECRET = randomBytes(32).toString("hex");
+const activeSessions = new Map();
+
+function parseCookie(req) {
+  const cookieHeader = req.headers.cookie || "";
+  const cookies = {};
+  cookieHeader.split(";").forEach((cookie) => {
+    const [name, ...rest] = cookie.trim().split("=");
+    if (name && rest.length > 0) cookies[name] = rest.join("=");
+  });
+  return cookies;
+}
+
+function createSession() {
+  const token = randomBytes(32).toString("hex");
+  activeSessions.set(token, { createdAt: Date.now() });
+  return token;
+}
+
+function validateSession(req) {
+  const cookies = parseCookie(req);
+  const token = cookies.aether_session;
+  if (!token || !activeSessions.has(token)) return false;
+  return true;
+}
+
+function clearSession(token) {
+  activeSessions.delete(token);
+}
+
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 
@@ -164,10 +195,22 @@ const server = createServer(async (req, res) => {
       }
       const { password } = await readJsonBody(req);
       if (password === ADMIN_PASSWORD) {
+        const token = createSession();
+        res.setHeader("Set-Cookie", `aether_session=${token}; HttpOnly; Path=/; Max-Age=86400; SameSite=Strict`);
         sendJson(res, 200, { success: true });
       } else {
         sendJson(res, 401, { error: { message: "Invalid password" } });
       }
+      return;
+    }
+
+    // Logout
+    if (url.pathname === "/api/auth/logout" && req.method === "POST") {
+      const cookies = parseCookie(req);
+      const token = cookies.aether_session;
+      if (token) clearSession(token);
+      res.setHeader("Set-Cookie", "aether_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict");
+      sendJson(res, 200, { success: true });
       return;
     }
 
@@ -317,6 +360,18 @@ const server = createServer(async (req, res) => {
         "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
       });
       res.end(faqHtml);
+      return;
+    }
+
+    // Protect admin panel assets — require server-side session
+    const protectedPaths = ["/", "/index.html", "/app.js", "/styles.css"];
+    if (protectedPaths.includes(url.pathname) && !validateSession(req)) {
+      if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
+        sendJson(res, 403, { error: { message: "Forbidden" } });
+      } else {
+        res.writeHead(302, { "Location": "/login.html" });
+        res.end();
+      }
       return;
     }
 
