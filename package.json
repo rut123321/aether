@@ -1,0 +1,14 @@
+{
+  "name": "aether",
+  "version": "1.0.0",
+  "description": "AgentRouter endpoint with custom API key management and credit system",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "license": "MIT"
+}

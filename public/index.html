@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentRouter Endpoint</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-label="AgentRouter endpoint dashboard">
+        <aside class="sidebar">
+          <div class="brand">
+            <div class="brand-mark" aria-hidden="true">AR</div>
+            <div>
+              <h1>Endpoint</h1>
+              <p>AgentRouter proxy</p>
+            </div>
+          </div>
+
+          <nav class="nav" aria-label="Основная навигация">
+            <a href="#" class="nav-item active" data-tab="issue-keys">Выдать ключ</a>
+            <a href="#" class="nav-item" data-tab="test-api">Тест API</a>
+            <a href="#" class="nav-item" data-tab="settings">Настройки</a>
+            <a href="#" class="nav-item" data-tab="stats">Статистика</a>
+            <a href="/faq" class="nav-item">FAQ</a>
+          </nav>
+
+          <div class="endpoint-box">
+            <span>Base URL</span>
+            <code id="localBaseUrl">...</code>
+            <button class="icon-button" type="button" data-copy-target="localBaseUrl" aria-label="Скопировать Base URL">
+              <span aria-hidden="true">⧉</span>
+            </button>
+          </div>
+        </aside>
+
+        <section class="content">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">Локальный шлюз</p>
+              <h2>Управление API ключами и тестирование</h2>
+            </div>
+            <div class="status-pill" id="serverStatus">
+              <span></span>
+              Проверка
+            </div>
+          </header>
+
+          <!-- Выдать ключ -->
+          <div id="issue-keys" class="tab-content active">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Выдать ключ</p>
+                <h3>Управление кастомными API ключами</h3>
+              </div>
+            </div>
+
+            <form id="createKeyForm" class="key-form">
+              <label>
+                Название
+                <input id="newKeyName" name="newKeyName" type="text" placeholder="Client1, Project A" required />
+              </label>
+              <label>
+                Кредиты
+                <input id="newKeyCredits" name="newKeyCredits" type="number" min="1" value="100000000" required />
+              </label>
+              <button class="primary-button" type="submit">Создать ключ</button>
+            </form>
+
+            <div class="keys-list" id="customKeysList">
+              <p>Загрузка ключей...</p>
+            </div>
+          </div>
+
+          <!-- Тест API -->
+          <div id="test-api" class="tab-content">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Тест API</p>
+                <h3>Проверка работы endpoint</h3>
+              </div>
+            </div>
+
+            <div class="split">
+              <div class="panel">
+                <form id="chatForm" class="chat-form">
+                  <label>
+                    Model
+                    <input id="modelInput" type="text" value="claude-opus-4-7" />
+                  </label>
+                  <label>
+                    Ключ для теста
+                    <select id="testKeySelect">
+                      <option value="">Без ключа (использовать AgentRouter ключ)</option>
+                    </select>
+                  </label>
+                  <label>
+                    Message
+                    <textarea id="messageInput" rows="5">Ответь коротко: endpoint работает?</textarea>
+                  </label>
+                  <label class="checkbox-label">
+                    <input id="streamInput" type="checkbox" />
+                    <span>Стриминг (stream)</span>
+                  </label>
+                  <button class="primary-button wide" type="submit">Отправить через /v1/chat/completions</button>
+                </form>
+              </div>
+
+              <div class="panel output-panel">
+                <div class="section-heading compact">
+                  <div>
+                    <p class="eyebrow">Ответ</p>
+                    <h3>Result</h3>
+                  </div>
+                  <button class="icon-button" type="button" data-copy-target="responseOutput" aria-label="Скопировать ответ">
+                    <span aria-hidden="true">⧉</span>
+                  </button>
+                </div>
+                <pre id="responseOutput">Выбери ключ и отправь тестовый запрос.</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Настройки -->
+          <div id="settings" class="tab-content">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Настройки</p>
+                <h3>AgentRouter API ключи</h3>
+              </div>
+              <a class="link-button" href="https://agentrouter.org/console/token" target="_blank" rel="noreferrer">Открыть токены</a>
+            </div>
+
+            <form class="key-form" id="keyForm" autocomplete="off">
+              <label>
+                Название
+                <input id="keyName" name="keyName" type="text" placeholder="Main, Work, Test" required />
+              </label>
+              <label>
+                API key
+                <input id="apiKey" name="apiKey" type="password" placeholder="sk-..." required />
+              </label>
+              <button class="primary-button" type="submit">Добавить</button>
+            </form>
+
+            <div class="toolbar">
+              <label>
+                Активный ключ
+                <select id="activeKeySelect"></select>
+              </label>
+              <button class="secondary-button" id="revealKeyButton" type="button">Показать</button>
+              <button class="danger-button" id="deleteKeyButton" type="button">Удалить</button>
+            </div>
+
+            <div class="notice">
+              Ключи сохраняются только в localStorage этого браузера. Сервер не пишет их на диск.
+            </div>
+          </div>
+
+          <!-- Статистика -->
+          <div id="stats" class="tab-content">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Статистика</p>
+                <h3>Метрики использования</h3>
+              </div>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon">🔑</div>
+                <div class="stat-value" id="totalKeys">0</div>
+                <div class="stat-label">Всего ключей</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-value" id="totalCredits">0</div>
+                <div class="stat-label">Всего кредитов</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-value" id="activeKeys">0</div>
+                <div class="stat-label">Активных ключей</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
