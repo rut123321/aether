@@ -392,6 +392,8 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       const reader = upstreamResponse.body.getReader();
       const decoder = new TextDecoder();
       let totalTokens = 0;
+      let responseCharCount = 0;
+      const requestCharCount = requestBody ? requestBody.toString().length : 0;
 
       const stream = new Readable({
         read() {}
@@ -400,9 +402,10 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       reader.read().then(async function process({ done, value }) {
         if (done) {
           stream.push(null);
-          // Deduct credits (100 credits = 1 token)
-          const creditsToDeduct = Math.ceil(totalTokens * 100);
-          if (creditsToDeduct > 0) {
+          // Fallback: estimate tokens from characters if usage not provided (~4 chars = 1 token)
+          const estimatedTokens = totalTokens || Math.ceil((requestCharCount + responseCharCount) / 4);
+          const creditsToDeduct = Math.ceil(Math.max(estimatedTokens, 1) * 100);
+          if (creditsToDeduct > 0 && apiKeys[customApiKey]) {
             apiKeys[customApiKey].credits -= creditsToDeduct;
             await saveKeys();
           }
@@ -411,6 +414,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
 
         const chunk = decoder.decode(value, { stream: true });
         stream.push(chunk);
+        responseCharCount += chunk.length;
 
         // Try to extract token usage from streaming response
         const lines = chunk.split("\n");
@@ -420,8 +424,8 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
             if (data === "[DONE]") continue;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.usage) {
-                totalTokens += parsed.usage.total_tokens || 0;
+              if (parsed.usage && parsed.usage.total_tokens) {
+                totalTokens = parsed.usage.total_tokens;
               }
             } catch {}
           }
@@ -437,8 +441,8 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       try {
         const responseData = JSON.parse(responseText);
         const totalTokens = responseData.usage?.total_tokens || 0;
-        const creditsToDeduct = Math.ceil(totalTokens * 100);
-        if (creditsToDeduct > 0) {
+        const creditsToDeduct = Math.ceil(Math.max(totalTokens, 1) * 100);
+        if (creditsToDeduct > 0 && apiKeys[customApiKey]) {
           apiKeys[customApiKey].credits -= creditsToDeduct;
           await saveKeys();
         }
