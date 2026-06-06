@@ -3,165 +3,234 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FAQ - Claude Code CLI Guide</title>
+    <title>FAQ - Aether</title>
+    <link rel="stylesheet" href="/styles.css" />
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0a0a0a;
-        min-height: 100vh;
-        padding: 20px;
-        color: #e0e0e0;
-        line-height: 1.6;
-      }
-      .container {
+      .faq-container {
         max-width: 900px;
         margin: 0 auto;
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 16px;
         padding: 40px;
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5);
       }
-      h1 {
-        color: #e0e0e0;
-        margin-bottom: 30px;
-        font-size: 32px;
+      .faq-header {
         text-align: center;
+        margin-bottom: 40px;
       }
-      h2 {
-        color: #e0e0e0;
-        margin-top: 40px;
-        margin-bottom: 20px;
-        font-size: 24px;
-        border-bottom: 1px solid #333;
-        padding-bottom: 10px;
+      .faq-header h1 {
+        font-size: 36px;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
-      h3 {
-        color: #c0c0c0;
-        margin-top: 25px;
-        margin-bottom: 15px;
-        font-size: 18px;
+      .faq-header p {
+        color: var(--muted);
+        font-size: 16px;
       }
-      p {
-        color: #c0c0c0;
-        margin-bottom: 15px;
-      }
-      code {
-        background: #252525;
-        padding: 2px 6px;
-        border-radius: 4px;
+      .endpoint-url {
+        display: inline-block;
+        padding: 12px 20px;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
         font-family: "JetBrains Mono", monospace;
+        color: var(--primary);
         font-size: 14px;
-        color: #7cb97c;
-      }
-      pre {
-        background: #0d0d0d;
-        border: 1px solid #333;
-        border-radius: 8px;
-        padding: 20px;
-        overflow-x: auto;
         margin: 20px 0;
       }
-      pre code {
-        background: none;
-        padding: 0;
-        color: #c0c0c0;
+      .section {
+        margin-bottom: 48px;
+      }
+      .section h2 {
+        font-size: 24px;
+        margin-bottom: 24px;
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        gap: 12px;
       }
       .step {
-        background: #252525;
-        border-left: 3px solid #4a4a4a;
-        padding: 20px;
+        background: var(--surface-2);
+        border-left: 3px solid var(--primary);
+        padding: 24px;
         margin: 20px 0;
-        border-radius: 0 8px 8px 0;
+        border-radius: 0 12px 12px 0;
+        transition: all 0.2s ease;
+      }
+      .step:hover {
+        background: var(--surface-3);
+        transform: translateX(4px);
       }
       .step-number {
-        display: inline-block;
-        background: #4a4a4a;
-        color: #e0e0e0;
-        width: 30px;
-        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        text-align: center;
-        line-height: 30px;
-        font-weight: bold;
-        margin-right: 10px;
+        background: var(--gradient-primary);
+        color: #ffffff;
+        font-weight: 700;
+        margin-right: 12px;
+        box-shadow: 0 4px 15px var(--primary-glow);
+      }
+      .step-title {
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--ink);
+        margin-bottom: 8px;
+      }
+      .step p {
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+      .code-block {
+        background: #0d0d0d;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 20px;
+        overflow-x: auto;
+        margin: 16px 0;
+      }
+      .code-block code {
+        color: #c0c0c0;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .code-block code .highlight {
+        color: var(--primary);
       }
       .warning {
-        background: rgba(90, 74, 45, 0.2);
-        border: 1px solid #5a4a2d;
-        border-radius: 8px;
-        padding: 15px;
+        background: var(--warning-bg);
+        border: 1px solid var(--warning);
+        border-left: 3px solid var(--warning);
+        border-radius: 10px;
+        padding: 16px 20px;
         margin: 20px 0;
       }
       .warning strong {
-        color: #d4a855;
+        color: var(--warning);
+      }
+      .warning p {
+        color: var(--ink);
+        margin: 0;
+      }
+      .faq-item {
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
+      }
+      .faq-item:hover {
+        border-color: var(--primary);
+        transform: translateY(-2px);
+      }
+      .faq-item h3 {
+        font-size: 16px;
+        margin-bottom: 12px;
+        color: var(--ink);
+      }
+      .faq-item p {
+        color: var(--muted);
+        margin: 0;
+      }
+      .faq-item ul {
+        margin: 12px 0 0 20px;
+        color: var(--muted);
+      }
+      .faq-item li {
+        margin-bottom: 6px;
       }
       .back-link {
         text-align: center;
-        margin-top: 40px;
+        margin-top: 48px;
       }
       .back-link a {
-        color: #888;
+        color: var(--muted);
         text-decoration: none;
         font-size: 14px;
+        transition: color 0.2s;
       }
       .back-link a:hover {
-        color: #e0e0e0;
+        color: var(--primary);
       }
-      ul {
-        color: #c0c0c0;
-        margin-left: 20px;
-        margin-bottom: 15px;
+      .link {
+        color: var(--primary);
+        text-decoration: none;
+        transition: color 0.2s;
       }
-      li {
-        margin-bottom: 8px;
+      .link:hover {
+        color: var(--primary-strong);
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>FAQ - Claude Code CLI Guide</h1>
+    <main class="shell">
+      <div class="workspace">
+        <section class="content">
+          <div class="faq-container">
+            <div class="faq-header">
+              <h1>❓ FAQ</h1>
+              <p>Гайд по использованию Aether endpoint</p>
+            </div>
 
-      <h2>Ваш Endpoint</h2>
-      <p>Base URL: <code id="endpointUrl">...</code></p>
+            <div class="section">
+              <h2>🔗 Ваш Endpoint</h2>
+              <p style="text-align: center;">
+                Base URL: <code class="endpoint-url" id="endpointUrl">...</code>
+              </p>
+            </div>
 
-      <h2>Как подключить Claude Code CLI к вашему endpoint</h2>
+            <div class="section">
+              <h2>🚀 Как подключить Claude Code CLI</h2>
 
-      <div class="step">
-        <span class="step-number">1</span>
-        <strong>Установите Claude Code CLI</strong>
-        <p>Скачайте и установите Claude Code CLI с официального сайта Anthropic или через пакетный менеджер:</p>
-        <pre><code>npm install -g @anthropic-ai/claude-code</code></pre>
-      </div>
+              <div class="step">
+                <span class="step-number">1</span>
+                <div>
+                  <div class="step-title">Установите Claude Code CLI</div>
+                  <p>Скачайте и установите Claude Code CLI:</p>
+                  <div class="code-block">
+                    <code>npm install -g @anthropic-ai/claude-code</code>
+                  </div>
+                </div>
+              </div>
 
-      <div class="step">
-        <span class="step-number">2</span>
-        <strong>Настройте Claude Code CLI</strong>
-        <p>Используйте ваш кастомный API ключ и Base URL:</p>
-        <pre><code># Linux/Mac
+              <div class="step">
+                <span class="step-number">2</span>
+                <div>
+                  <div class="step-title">Настройте Claude Code CLI</div>
+                  <p>Используйте ваш кастомный API ключ и Base URL:</p>
+                  <div class="code-block">
+                    <code># Linux/Mac
 export ANTHROPIC_API_KEY="ваш-кастомный-ключ"
 export ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"
 
 # Windows PowerShell
 $env:ANTHROPIC_API_KEY="ваш-кастомный-ключ"
-$env:ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"</code></pre>
-      </div>
+$env:ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"</code>
+                  </div>
+                </div>
+              </div>
 
-      <div class="step">
-        <span class="step-number">3</span>
-        <strong>Запустите Claude Code CLI</strong>
-        <p>Теперь вы можете запустить Claude Code CLI:</p>
-        <pre><code>claude-code</code></pre>
-      </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <div>
+                  <div class="step-title">Запустите Claude Code CLI</div>
+                  <p>Теперь вы можете запустить Claude Code CLI:</p>
+                  <div class="code-block">
+                    <code>claude-code</code>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      <h2>Использование с OpenAI SDK</h2>
-      <p>Вы также можете использовать стандартный OpenAI SDK:</p>
-      <pre><code>import OpenAI from "openai";
+            <div class="section">
+              <h2>💻 Использование с OpenAI SDK</h2>
+              <p>Вы также можете использовать стандартный OpenAI SDK:</p>
+              <div class="code-block">
+                <code>import OpenAI from "openai";
 
 const client = new OpenAI({
   baseURL: "<span class="base-url-placeholder">...</span>",
@@ -173,47 +242,70 @@ const response = await client.chat.completions.create({
   messages: [{ role: "user", content: "Hello" }],
 });
 
-console.log(response.choices[0].message.content);</code></pre>
+console.log(response.choices[0].message.content);</code>
+              </div>
+            </div>
 
-      <h2>Использование с curl</h2>
-      <pre><code>curl <span class="base-url-placeholder">...</span>/chat/completions \
+            <div class="section">
+              <h2>📡 Использование с curl</h2>
+              <div class="code-block">
+                <code>curl <span class="base-url-placeholder">...</span>/chat/completions \
   -H "Authorization: Bearer ваш-кастомный-ключ" \
   -H "Content-Type: application/json" \
-  -d '{"model":"claude-opus-4-7","messages":[{"role":"user","content":"Hello"}]}'</code></pre>
+  -d '{"model":"claude-opus-4-7","messages":[{"role":"user","content":"Hello"}]}'</code>
+              </div>
+            </div>
 
-      <h2>Дополнительные команды</h2>
-      <ul>
-        <li><code>claude-code --help</code> - показать справку по командам</li>
-        <li><code>claude-code --model claude-opus-4-7</code> - указать модель</li>
-        <li><code>claude-code --stream</code> - включить стриминг ответов</li>
-      </ul>
+            <div class="section">
+              <h2>⚡ Дополнительные команды</h2>
+              <ul style="color: var(--muted); margin-left: 20px;">
+                <li><code>claude-code --help</code> - показать справку по командам</li>
+                <li><code>claude-code --model claude-opus-4-7</code> - указать модель</li>
+                <li><code>claude-code --stream</code> - включить стриминг ответов</li>
+              </ul>
+            </div>
 
-      <h2>Проверка баланса</h2>
-      <p>Вы можете проверить баланс вашего API ключа на странице <a href="/balance" style="color: #7cb97c;">/balance</a>. Просто введите ваш кастомный ключ и нажмите "Проверить баланс".</p>
+            <div class="section">
+              <h2>💰 Проверка баланса</h2>
+              <p>Вы можете проверить баланс вашего API ключа на странице <a href="/balance" class="link">/balance</a>.</p>
+            </div>
 
-      <h2>Часто задаваемые вопросы</h2>
+            <div class="section">
+              <h2>❓ Часто задаваемые вопросы</h2>
 
-      <h3>Почему я получаю ошибку "Invalid token"?</h3>
-      <p>Убедитесь, что:</p>
-      <ul>
-        <li>Вы используете кастомный API ключ, созданный на этом endpoint</li>
-        <li>Ключ скопирован полностью без лишних пробелов</li>
-        <li>Сервер endpoint доступен</li>
-      </ul>
+              <div class="faq-item">
+                <h3>Почему я получаю ошибку "Invalid token"?</h3>
+                <p>Убедитесь, что:</p>
+                <ul>
+                  <li>Вы используете кастомный API ключ, созданный на этом endpoint</li>
+                  <li>Ключ скопирован полностью без лишних пробелов</li>
+                  <li>Сервер endpoint доступен</li>
+                </ul>
+              </div>
 
-      <h3>Как изменить модель?</h3>
-      <p>Вы можете указать модель через флаг <code>--model</code> или в конфигурационном файле. Доступные модели: <code>claude-opus-4-7</code>, <code>claude-sonnet-4-5</code> и другие.</p>
+              <div class="faq-item">
+                <h3>Как изменить модель?</h3>
+                <p>Вы можете указать модель через флаг <code>--model</code> или в конфигурационном файле. Доступные модели: <code>claude-opus-4-7</code>, <code>claude-sonnet-4-5</code> и другие.</p>
+              </div>
 
-      <h3>Сколько кредитов тратится?</h3>
-      <p>Кредиты тратятся в зависимости от количества токенов в запросе и ответе. Вы можете проверить текущий баланс на странице /balance.</p>
+              <div class="faq-item">
+                <h3>Сколько кредитов тратится?</h3>
+                <p>Кредиты тратятся в зависимости от количества токенов в запросе и ответе. Вы можете проверить текущий баланс на странице /balance.</p>
+              </div>
 
-      <h3>Как увеличить лимит кредитов?</h3>
-      <p>Свяжитесь с администратором endpoint для увеличения лимита кредитов на вашем ключе.</p>
+              <div class="faq-item">
+                <h3>Как увеличить лимит кредитов?</h3>
+                <p>Свяжитесь с администратором endpoint для увеличения лимита кредитов на вашем ключе.</p>
+              </div>
+            </div>
 
-      <div class="back-link">
-        <a href="/">← Вернуться на главную</a>
+            <div class="back-link">
+              <a href="/">← Вернуться на главную</a>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
 
     <script>
       // Auto-detect the current endpoint URL

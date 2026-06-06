@@ -1,17 +1,25 @@
 :root {
   color-scheme: dark;
-  --bg: #0a0a0a;
-  --surface: #1a1a1a;
-  --surface-2: #252525;
-  --ink: #e0e0e0;
-  --muted: #888888;
-  --line: #333333;
-  --primary: #4a4a4a;
-  --primary-strong: #5a5a5a;
-  --danger: #5a2d2d;
-  --warning: #5a4a2d;
-  --success: #2d5a2d;
-  --shadow: 0 18px 45px rgba(0, 0, 0, 0.5);
+  --bg: #050505;
+  --surface: #0f0f0f;
+  --surface-2: #1a1a1a;
+  --surface-3: #252525;
+  --ink: #f0f0f0;
+  --muted: #9ca3af;
+  --line: #2a2a2a;
+  --primary: #6366f1;
+  --primary-strong: #818cf8;
+  --primary-glow: rgba(99, 102, 241, 0.3);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 35px 60px -15px rgba(0, 0, 0, 0.6);
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-surface: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 100%);
 }
 
 * {
@@ -24,13 +32,14 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family:
-    Inter,
+    "Inter",
     ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  line-height: 1.6;
 }
 
 button,
@@ -64,9 +73,9 @@ code {
   min-height: calc(100vh - 48px);
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
 }
 
 .sidebar {
@@ -89,11 +98,12 @@ code {
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 8px;
-  background: var(--ink);
+  border-radius: 12px;
+  background: var(--gradient-primary);
   color: #ffffff;
   font-weight: 800;
   letter-spacing: 0;
+  box-shadow: 0 4px 15px var(--primary-glow);
 }
 
 .brand h1,
@@ -122,15 +132,30 @@ code {
 .nav-item {
   min-height: 42px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--muted);
   text-decoration: none;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.nav-item:hover,
-.nav-item.active {
-  background: var(--primary);
+.nav-item span {
+  font-size: 18px;
+}
+
+.nav-item:hover {
+  background: var(--surface-3);
   color: var(--ink);
+  transform: translateX(4px);
+}
+
+.nav-item.active {
+  background: var(--gradient-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 15px var(--primary-glow);
 }
 
 .endpoint-box {
@@ -139,10 +164,10 @@ code {
   gap: 8px;
   align-items: center;
   margin-top: auto;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: 12px;
+  background: var(--surface-2);
 }
 
 .endpoint-box span {
@@ -283,11 +308,12 @@ textarea {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: 10px;
+  background: var(--surface-2);
   color: var(--ink);
   outline: none;
-  padding: 10px 12px;
+  padding: 10px 14px;
+  transition: all 0.2s ease;
 }
 
 textarea {
@@ -298,8 +324,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--primary-strong);
-  box-shadow: 0 0 0 3px rgba(74, 74, 74, 0.3);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 .toolbar {
@@ -327,30 +353,41 @@ textarea:focus {
 }
 
 .primary-button {
-  background: var(--primary);
+  background: var(--gradient-primary);
   color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 15px var(--primary-glow);
+  transition: all 0.3s ease;
 }
 
 .primary-button:hover {
-  background: var(--primary-strong);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--primary-glow);
 }
 
 .secondary-button,
 .link-button {
   border-color: var(--line);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--ink);
+  transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+  background: var(--surface-3);
+  border-color: var(--primary);
 }
 
 .danger-button {
   border-color: var(--danger);
-  background: rgba(90, 45, 45, 0.3);
-  color: #ff6b6b;
+  background: var(--danger-bg);
+  color: var(--danger);
+  transition: all 0.2s ease;
 }
 
 .danger-button:hover {
-  background: rgba(90, 45, 45, 0.5);
+  background: rgba(239, 68, 68, 0.2);
+  transform: translateY(-1px);
 }
 
 .icon-button {
@@ -368,12 +405,13 @@ textarea:focus {
 
 .notice {
   margin-top: 14px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--warning);
-  border-radius: 8px;
-  background: rgba(90, 74, 45, 0.2);
-  color: #d4a855;
+  border-radius: 10px;
+  background: var(--warning-bg);
+  color: var(--warning);
   font-size: 14px;
+  border-left: 3px solid var(--warning);
 }
 
 .keys-list {
@@ -387,10 +425,17 @@ textarea:focus {
   grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: center;
-  padding: 12px 14px;
+  padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: 12px;
+  background: var(--surface-2);
+  transition: all 0.2s ease;
+}
+
+.key-item:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px var(--primary-glow);
 }
 
 .key-info {
@@ -540,16 +585,34 @@ pre {
 }
 
 .stat-card {
-  padding: 20px;
+  padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-2);
-  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 16px;
+  background: var(--gradient-surface);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
 }
 
 .stat-card .stat-value {

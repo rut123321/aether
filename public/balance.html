@@ -3,159 +3,156 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Проверка баланса API ключа</title>
+    <title>Проверка баланса - Aether</title>
+    <link rel="stylesheet" href="/styles.css" />
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
+      .balance-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 40px;
       }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0a0a0a;
-        min-height: 100vh;
+      .balance-header {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+      .balance-header h1 {
+        font-size: 32px;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .balance-header p {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .result-card {
+        margin-top: 24px;
+        padding: 24px;
+        border-radius: 16px;
+        display: none;
+        animation: slideIn 0.3s ease;
+      }
+      .result-card.show {
+        display: block;
+      }
+      .result-card.success {
+        background: var(--success-bg);
+        border: 1px solid var(--success);
+      }
+      .result-card.error {
+        background: var(--danger-bg);
+        border: 1px solid var(--danger);
+      }
+      .result-card h2 {
+        font-size: 18px;
+        margin-bottom: 16px;
         display: flex;
         align-items: center;
-        justify-content: center;
-        padding: 20px;
-        color: #e0e0e0;
+        gap: 8px;
       }
-      .container {
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 16px;
-        padding: 40px;
-        max-width: 500px;
-        width: 100%;
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5);
+      .result-card p {
+        margin: 8px 0;
+        color: var(--ink);
       }
-      h1 {
-        text-align: center;
-        color: #e0e0e0;
-        margin-bottom: 30px;
-        font-size: 24px;
+      .result-card strong {
+        color: var(--ink);
+        font-weight: 600;
       }
-      .form-group {
-        margin-bottom: 20px;
+      .balance-info {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
       }
-      label {
-        display: block;
-        margin-bottom: 8px;
-        color: #888;
+      .balance-info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+      }
+      .balance-info-item label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .balance-info-item span {
+        color: var(--ink);
         font-weight: 600;
         font-size: 14px;
       }
-      input {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid #333;
-        border-radius: 8px;
-        background: #252525;
-        color: #e0e0e0;
-        font-size: 16px;
-        transition: border-color 0.3s;
-      }
-      input:focus {
-        outline: none;
-        border-color: #5a5a5a;
-      }
-      button {
-        width: 100%;
-        padding: 14px;
-        background: #4a4a4a;
-        color: #ffffff;
-        border: none;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.2s, background 0.2s;
-      }
-      button:hover {
-        transform: translateY(-1px);
-        background: #5a5a5a;
-      }
-      button:active {
-        transform: translateY(0);
-      }
-      .result {
-        margin-top: 24px;
-        padding: 20px;
-        border-radius: 8px;
-        background: #252525;
-        display: none;
-      }
-      .result.show {
-        display: block;
-      }
-      .result.success {
-        background: rgba(45, 90, 45, 0.2);
-        border: 1px solid #2d5a2d;
-      }
-      .result.error {
-        background: rgba(90, 45, 45, 0.2);
-        border: 1px solid #5a2d2d;
-      }
-      .result h2 {
-        font-size: 18px;
-        margin-bottom: 12px;
-        color: #e0e0e0;
-      }
-      .result p {
-        margin: 8px 0;
-        color: #c0c0c0;
-      }
-      .result strong {
-        color: #e0e0e0;
-      }
       .loading {
         text-align: center;
-        color: #888;
+        color: var(--muted);
         margin-top: 20px;
         display: none;
+        padding: 20px;
       }
       .loading.show {
         display: block;
       }
       .back-link {
         text-align: center;
-        margin-top: 20px;
+        margin-top: 32px;
       }
       .back-link a {
-        color: #888;
+        color: var(--muted);
         text-decoration: none;
         font-size: 14px;
+        transition: color 0.2s;
       }
       .back-link a:hover {
-        color: #e0e0e0;
+        color: var(--primary);
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>Проверка баланса</h1>
-      <form id="balanceForm">
-        <div class="form-group">
-          <label for="apiKey">API ключ</label>
-          <input 
-            id="apiKey" 
-            type="text" 
-            placeholder="sk-..." 
-            required 
-            autocomplete="off"
-          />
-        </div>
-        <button type="submit">Проверить баланс</button>
-      </form>
-      <div class="loading" id="loading">Проверка...</div>
-      <div class="result" id="result">
-        <h2 id="resultTitle"></h2>
-        <p id="resultContent"></p>
+    <main class="shell">
+      <div class="workspace">
+        <section class="content">
+          <div class="balance-container">
+            <div class="balance-header">
+              <h1>💰 Проверка баланса</h1>
+              <p>Введите ваш API ключ для проверки баланса кредитов</p>
+            </div>
+            <form id="balanceForm" class="key-form" style="grid-template-columns: 1fr;">
+              <label>
+                API ключ
+                <input 
+                  id="apiKey" 
+                  type="text" 
+                  placeholder="sk-..." 
+                  required 
+                  autocomplete="off"
+                />
+              </label>
+              <button class="primary-button" type="submit">Проверить баланс</button>
+            </form>
+            <div class="loading" id="loading">
+              <span>⏳</span> Проверка...
+            </div>
+            <div class="result-card" id="result">
+              <h2 id="resultTitle"></h2>
+              <div id="resultContent"></div>
+            </div>
+            <div class="back-link">
+              <a href="/">← Вернуться на главную</a>
+            </div>
+          </div>
+        </section>
       </div>
-      <div class="back-link">
-        <a href="/">← Вернуться на главную</a>
-      </div>
-    </div>
+    </main>
 
     <script>
       const form = document.getElementById("balanceForm");
@@ -169,7 +166,7 @@
         const apiKey = document.getElementById("apiKey").value.trim();
         
         if (!apiKey) {
-          showResult("error", "Ошибка", "Введите API ключ");
+          showResult("error", "❌ Ошибка", "Введите API ключ");
           return;
         }
 
@@ -189,7 +186,16 @@
             showResult(
               "success",
               "✅ Баланс найден",
-              `<strong>Название:</strong> ${data.name}<br><strong>Кредиты:</strong> ${data.balance}`
+              `<div class="balance-info">
+                <div class="balance-info-item">
+                  <label>Название</label>
+                  <span>${data.name}</span>
+                </div>
+                <div class="balance-info-item">
+                  <label>Кредиты</label>
+                  <span>${data.balance.toLocaleString()}</span>
+                </div>
+              </div>`
             );
           } else {
             showResult("error", "❌ Ошибка", data.error || "Ключ не найден");
@@ -202,7 +208,7 @@
       });
 
       function showResult(type, title, content) {
-        result.className = `result show ${type}`;
+        result.className = `result-card show ${type}`;
         resultTitle.textContent = title;
         resultContent.innerHTML = content;
       }
