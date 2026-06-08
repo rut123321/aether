@@ -87,10 +87,19 @@ const AGENTROUTER_RELAY_KEY = process.env.AGENTROUTER_RELAY_KEY || "";
 const UPSTREAM_WAF_RETRY = process.env.UPSTREAM_WAF_RETRY !== "false";
 const UPSTREAM_USER_AGENT =
   process.env.UPSTREAM_USER_AGENT || "AetherEndpoint/1.0";
+const NON_STREAM_KEEPALIVE = process.env.NON_STREAM_KEEPALIVE !== "false";
+const NON_STREAM_KEEPALIVE_START_MS = readPositiveIntegerEnv(
+  "NON_STREAM_KEEPALIVE_START_MS",
+  60_000,
+);
+const NON_STREAM_KEEPALIVE_INTERVAL_MS = readPositiveIntegerEnv(
+  "NON_STREAM_KEEPALIVE_INTERVAL_MS",
+  15_000,
+);
 const ALLOW_DIRECT_UPSTREAM_KEYS = process.env.ALLOW_DIRECT_UPSTREAM_KEYS === "true";
 const ALLOW_SERVER_KEY_PROXY = process.env.ALLOW_SERVER_KEY_PROXY === "true";
 const ALLOWED_MODELS = ["claude-opus-4-7", "glm-5.1"];
-const CREDITS_PER_TOKEN = readPositiveIntegerEnv("CREDITS_PER_TOKEN", 10);
+const CREDITS_PER_TOKEN = readPositiveIntegerEnv("CREDITS_PER_TOKEN", 50);
 const AGENTROUTER_CLIENT_PROFILE = process.env.AGENTROUTER_CLIENT_PROFILE || "none";
 const CODEX_COMPAT_VERSION = process.env.AGENTROUTER_CODEX_VERSION || "0.101.0";
 const CODEX_COMPAT_USER_AGENT =
@@ -352,7 +361,17 @@ const server = createServer(async (req, res) => {
       const { key } = await readJsonBody(req);
       const row = await db.getKey(key);
       if (row) {
-        sendJson(res, 200, { balance: row.credits, name: row.name });
+        const history = await db.recentUsage(key, 10);
+        sendJson(res, 200, {
+          balance: row.credits,
+          name: row.name,
+          history: (history || []).map((h) => ({
+            model: h.model,
+            tokens: h.tokens,
+            credits: h.credits,
+            createdAt: h.created_at,
+          })),
+        });
       } else {
         sendJson(res, 404, { error: "Key not found" });
       }
@@ -390,8 +409,9 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // Protect admin panel assets — require server-side session
-    const protectedPaths = ["/", "/index.html", "/app.js", "/styles.css"];
+    // Protect admin panel assets — require server-side session.
+    // styles.css is intentionally excluded so /balance and /faq render properly.
+    const protectedPaths = ["/", "/index.html", "/app.js"];
     if (protectedPaths.includes(url.pathname) && !validateSession(req)) {
       if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
         sendJson(res, 403, { error: { message: "Forbidden" } });
@@ -530,6 +550,10 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
     requestBody = Buffer.from(JSON.stringify(parsedBody));
   }
 
+  const jsonKeepAlive = shouldUseNonStreamKeepAlive(req, isStream, parsedBody)
+    ? createDelayedJsonKeepAlive(res)
+    : null;
+
   const upstreamResult = await fetchUpstreamWithWafRetry(
     req,
     upstreamUrl,
@@ -538,7 +562,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   );
 
   if (upstreamResult.wafChallenge) {
-    sendJson(res, 502, {
+    const payload = {
       error: {
         code: "UPSTREAM_WAF_CHALLENGE",
         message: "AgentRouter returned an Aliyun WAF browser verification page instead of an API response.",
@@ -547,11 +571,23 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
         upstreamBaseUrl: AGENTROUTER_BASE_URL,
         attemptedProfiles: upstreamResult.attemptedProfiles,
       },
-    });
+    };
+    if (finishJsonKeepAlive(jsonKeepAlive, payload)) {
+      return;
+    }
+    sendJson(res, 502, payload);
     return;
   }
 
   if (upstreamResult.htmlResponse) {
+    if (finishJsonKeepAlive(jsonKeepAlive, {
+      error: {
+        message: "Upstream returned an HTML response instead of JSON.",
+        upstreamStatus: upstreamResult.status,
+      },
+    })) {
+      return;
+    }
     res.writeHead(upstreamResult.status, {
       "content-type": upstreamResult.contentType || "text/html; charset=utf-8",
       "cache-control": "no-store",
@@ -561,6 +597,16 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   }
 
   const upstreamResponse = upstreamResult.response;
+
+  if (jsonKeepAlive?.started) {
+    const responseText = upstreamResponse.body ? await upstreamResponse.text() : "";
+    if (usingCustomKey) {
+      await deductCreditsFromResponseText(customApiKey, responseText, parsedBody?.model);
+    }
+    finishJsonKeepAliveRaw(jsonKeepAlive, responseText);
+    return;
+  }
+  cancelJsonKeepAlive(jsonKeepAlive);
 
   const responseHeaders = {};
   upstreamResponse.headers.forEach((value, key) => {
@@ -585,6 +631,7 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       const reader = upstreamResponse.body.getReader();
       const decoder = new TextDecoder();
       let totalTokens = 0;
+      let streamModel = null;
       let buffer = "";
 
       const stream = new Readable({
@@ -601,6 +648,12 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
           const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
           try {
             await db.deductCredits(customApiKey, creditsToDeduct);
+            await db.logUsage({
+              key: customApiKey,
+              model: parsedBody?.model || streamModel || null,
+              tokens: tokensToCharge,
+              credits: creditsToDeduct,
+            });
           } catch (err) {
             console.error("deductCredits failed:", err.message);
           }
@@ -625,6 +678,9 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
             if (typeof tt === "number" && tt > totalTokens) {
               totalTokens = tt;
             }
+            if (!streamModel && typeof parsed.model === "string") {
+              streamModel = parsed.model;
+            }
           } catch {}
         }
 
@@ -635,23 +691,33 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
     } else {
       // Handle non-streaming response
       const responseText = await upstreamResponse.text();
-      try {
-        const responseData = JSON.parse(responseText);
-        const totalTokens = Number(responseData.usage?.total_tokens) || 0;
-        const tokensToCharge = totalTokens > 0 ? totalTokens : 1;
-        const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
-        try {
-          await db.deductCredits(customApiKey, creditsToDeduct);
-        } catch (err) {
-          console.error("deductCredits failed:", err.message);
-        }
-        res.end(responseText);
-      } catch {
-        res.end(responseText);
-      }
+      await deductCreditsFromResponseText(customApiKey, responseText, parsedBody?.model);
+      res.end(responseText);
     }
   } else {
     Readable.fromWeb(upstreamResponse.body).pipe(res);
+  }
+}
+
+async function deductCreditsFromResponseText(customApiKey, responseText, model) {
+  try {
+    const responseData = JSON.parse(responseText);
+    const totalTokens = Number(responseData.usage?.total_tokens) || 0;
+    const tokensToCharge = totalTokens > 0 ? totalTokens : 1;
+    const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
+    try {
+      await db.deductCredits(customApiKey, creditsToDeduct);
+      await db.logUsage({
+        key: customApiKey,
+        model: model || responseData.model || null,
+        tokens: tokensToCharge,
+        credits: creditsToDeduct,
+      });
+    } catch (err) {
+      console.error("deductCredits failed:", err.message);
+    }
+  } catch {
+    // Keep the upstream body unchanged even when it is not JSON.
   }
 }
 
@@ -788,6 +854,87 @@ function shouldForwardRequestHeader(key) {
     "anthropic-version",
     "anthropic-beta",
   ].includes(key) || key.startsWith("anthropic-");
+}
+
+function shouldUseNonStreamKeepAlive(req, isStream, parsedBody) {
+  return NON_STREAM_KEEPALIVE &&
+    !isStream &&
+    canHaveBody(req.method) &&
+    parsedBody &&
+    !req.url?.includes("/embeddings");
+}
+
+function createDelayedJsonKeepAlive(res) {
+  let started = false;
+  let startTimer = null;
+  let keepAliveTimer = null;
+
+  const start = () => {
+    if (started || res.headersSent || res.writableEnded) {
+      return;
+    }
+
+    started = true;
+    res.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "access-control-allow-origin": "*",
+      "access-control-expose-headers": "*",
+    });
+
+    // Leading JSON whitespace is valid and keeps Cloudflare/Render from
+    // treating long non-streaming model calls as a silent origin.
+    res.write("\n");
+    keepAliveTimer = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write("\n");
+      }
+    }, NON_STREAM_KEEPALIVE_INTERVAL_MS);
+    keepAliveTimer.unref?.();
+  };
+
+  startTimer = setTimeout(start, NON_STREAM_KEEPALIVE_START_MS);
+  startTimer.unref?.();
+
+  return {
+    get started() {
+      return started;
+    },
+    cancel() {
+      clearTimeout(startTimer);
+      clearInterval(keepAliveTimer);
+    },
+    finish(responseText) {
+      clearTimeout(startTimer);
+      clearInterval(keepAliveTimer);
+
+      if (!started) {
+        return false;
+      }
+
+      if (!res.writableEnded) {
+        res.end(responseText);
+      }
+      return true;
+    },
+  };
+}
+
+function cancelJsonKeepAlive(jsonKeepAlive) {
+  jsonKeepAlive?.cancel();
+}
+
+function finishJsonKeepAlive(jsonKeepAlive, data) {
+  return finishJsonKeepAliveRaw(jsonKeepAlive, JSON.stringify(data, null, 2));
+}
+
+function finishJsonKeepAliveRaw(jsonKeepAlive, responseText) {
+  if (!jsonKeepAlive?.started) {
+    cancelJsonKeepAlive(jsonKeepAlive);
+    return false;
+  }
+
+  return jsonKeepAlive.finish(responseText);
 }
 
 function shouldSkipResponseHeader(key) {

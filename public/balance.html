@@ -100,6 +100,48 @@
         font-weight: 600;
         font-size: 14px;
       }
+      .history-section {
+        margin-top: 24px;
+      }
+      .history-title {
+        font-size: 13px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .history-table th,
+      .history-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+      }
+      .history-table th {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      .history-table td {
+        color: var(--ink);
+      }
+      .history-table td.numeric {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .history-empty {
+        padding: 16px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
       .loading {
         text-align: center;
         color: var(--muted);
@@ -201,18 +243,23 @@
           const data = await response.json();
 
           if (response.ok) {
+            const historyHtml = renderHistory(data.history || []);
             showResult(
               "success",
               "Баланс найден",
               `<div class="balance-info">
                 <div class="balance-info-item">
                   <label>Название</label>
-                  <span>${data.name}</span>
+                  <span>${escapeHtml(data.name)}</span>
                 </div>
                 <div class="balance-info-item">
                   <label>Кредиты</label>
                   <span>${data.balance.toLocaleString()}</span>
                 </div>
+              </div>
+              <div class="history-section">
+                <div class="history-title">Последние 10 запросов</div>
+                ${historyHtml}
               </div>`
             );
           } else {
@@ -224,6 +271,42 @@
           loading.classList.remove("show");
         }
       });
+
+      function renderHistory(history) {
+        if (!history.length) {
+          return '<div class="history-empty">Запросов пока не было</div>';
+        }
+        const rows = history.map((h) => {
+          const dt = h.createdAt ? new Date(h.createdAt) : null;
+          const time = dt ? dt.toLocaleString() : "—";
+          return `<tr>
+            <td>${escapeHtml(time)}</td>
+            <td>${escapeHtml(h.model || "—")}</td>
+            <td class="numeric">${Number(h.tokens || 0).toLocaleString()}</td>
+            <td class="numeric">${Number(h.credits || 0).toLocaleString()}</td>
+          </tr>`;
+        }).join("");
+        return `<table class="history-table">
+          <thead>
+            <tr>
+              <th>Время</th>
+              <th>Модель</th>
+              <th style="text-align:right">Токены</th>
+              <th style="text-align:right">Кредиты</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      }
+
+      function escapeHtml(s) {
+        return String(s == null ? "" : s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
 
       function showResult(type, title, content) {
         result.className = `result-card show ${type}`;

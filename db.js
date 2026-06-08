@@ -123,3 +123,25 @@ export async function stats() {
   const activeKeys = rows.filter((r) => Number(r.credits) > 0).length;
   return { totalKeys, totalCredits, activeKeys };
 }
+
+export async function logUsage({ key, model, tokens, credits }) {
+  try {
+    await request("/usage_log", {
+      method: "POST",
+      headers: { prefer: "return=minimal" },
+      body: JSON.stringify({ key, model, tokens, credits }),
+    });
+  } catch (err) {
+    console.error("logUsage failed:", err.message);
+  }
+}
+
+export async function recentUsage(key, limit = 10) {
+  const params = new URLSearchParams({
+    select: "model,tokens,credits,created_at",
+    key: `eq.${key}`,
+    order: "created_at.desc",
+    limit: String(limit),
+  });
+  return request(`/usage_log?${params.toString()}`);
+}

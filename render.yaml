@@ -18,3 +18,9 @@ services:
         value: true
       - key: UPSTREAM_USER_AGENT
         value: AetherEndpoint/1.0
+      - key: NON_STREAM_KEEPALIVE
+        value: true
+      - key: NON_STREAM_KEEPALIVE_START_MS
+        value: 60000
+      - key: NON_STREAM_KEEPALIVE_INTERVAL_MS
+        value: 15000

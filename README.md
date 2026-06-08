@@ -47,6 +47,23 @@ OpenAI-compatible endpoint для AgentRouter с панелью управлен
 - держать endpoint на машине/сервере, с которого AgentRouter не показывает WAF verification;
 - сменить хостинг и проверить конкретный egress IP, но бесплатный PaaS не дает гарантии.
 
+## Ошибка Cloudflare 524 на долгих ответах
+
+`524` означает, что Cloudflare/Render подключился к серверу, но сервер слишком долго не отдавал байты ответа, пока ждал модель.
+
+Для non-stream запросов включен JSON-safe keepalive:
+
+- быстрые ответы идут как раньше;
+- если non-stream ответ идет долго, сервер через `NON_STREAM_KEEPALIVE_START_MS` начинает отправлять пустые JSON-whitespace строки;
+- потом дописывает обычный JSON-ответ модели;
+- JSON-клиенты нормально парсят такой ответ, потому что ведущие переносы строк разрешены JSON-форматом.
+
+Переменные:
+
+- `NON_STREAM_KEEPALIVE=true`
+- `NON_STREAM_KEEPALIVE_START_MS=60000`
+- `NON_STREAM_KEEPALIVE_INTERVAL_MS=15000`
+
 ## Локальный запуск
 
 ```bash
@@ -73,9 +90,12 @@ npm start
 
 - `PORT` - порт сервера, по умолчанию `3000`.
 - `AGENTROUTER_BASE_URL` - upstream URL, по умолчанию `https://agentrouter.org/v1`.
-- `AGENTROUTER_CLIENT_PROFILE` - профиль заголовков. По умолчанию `none`. Значение `codex` включает совместимые заголовки, но на публичном хостинге может выглядеть подозрительно.
+- `AGENTROUTER_CLIENT_PROFILE` - профиль заголовков. Для текущего AgentRouter ключа используется `codex`.
 - `UPSTREAM_WAF_RETRY` - повторить upstream-запрос вторым профилем заголовков, если AgentRouter вернул Aliyun WAF HTML. По умолчанию `true`.
 - `UPSTREAM_USER_AGENT` - обычный server-to-server User-Agent для первого upstream-запроса, по умолчанию `AetherEndpoint/1.0`.
+- `NON_STREAM_KEEPALIVE` - держать долгие non-stream JSON-запросы активными, чтобы не ловить Cloudflare 524. По умолчанию `true`.
+- `NON_STREAM_KEEPALIVE_START_MS` - когда начинать keepalive, по умолчанию `60000`.
+- `NON_STREAM_KEEPALIVE_INTERVAL_MS` - как часто слать keepalive, по умолчанию `15000`.
 - `MAX_REQUEST_BYTES` - лимит тела запроса, по умолчанию `20971520`.
 - `PROXY_SHARED_KEY` - дополнительный общий ключ для `/v1`, если нужно закрыть прокси от всех, кроме доверенных клиентов.
 - `ALLOW_DIRECT_UPSTREAM_KEYS=true` - разрешает публичным клиентам проксировать свои AgentRouter-ключи через `Authorization` или `x-agentrouter-key`. По умолчанию выключено.
@@ -92,9 +112,12 @@ npm start
 - Environment:
   - `AGENTROUTER_API_KEY`
   - `ADMIN_TOKEN`
-  - `AGENTROUTER_CLIENT_PROFILE=none`
+  - `AGENTROUTER_CLIENT_PROFILE=codex`
   - `UPSTREAM_WAF_RETRY=true`
   - `UPSTREAM_USER_AGENT=AetherEndpoint/1.0`
+  - `NON_STREAM_KEEPALIVE=true`
+  - `NON_STREAM_KEEPALIVE_START_MS=60000`
+  - `NON_STREAM_KEEPALIVE_INTERVAL_MS=15000`
 
 Если WAF был из-за forwarded/proxy headers, этот вариант должен перестать получать Aliyun verification page.
 
@@ -106,9 +129,12 @@ Railway обычно подхватывает Node-проект через Nixpa
 - Variables:
   - `AGENTROUTER_API_KEY`
   - `ADMIN_TOKEN`
-  - `AGENTROUTER_CLIENT_PROFILE=none`
+  - `AGENTROUTER_CLIENT_PROFILE=codex`
   - `UPSTREAM_WAF_RETRY=true`
   - `UPSTREAM_USER_AGENT=AetherEndpoint/1.0`
+  - `NON_STREAM_KEEPALIVE=true`
+  - `NON_STREAM_KEEPALIVE_START_MS=60000`
+  - `NON_STREAM_KEEPALIVE_INTERVAL_MS=15000`
 
 Если после этого все равно приходит `UPSTREAM_WAF_CHALLENGE`, значит AgentRouter режет сам egress IP Railway, а не заголовки запроса.
 
