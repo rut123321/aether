@@ -132,6 +132,7 @@ export async function logUsage({ key, model, tokens, credits }) {
       body: JSON.stringify({ key, model, tokens, credits }),
     });
   } catch (err) {
+    // Don't fail the request if logging is broken (e.g. usage_log table not created yet).
     console.error("logUsage failed:", err.message);
   }
 }
@@ -143,5 +144,12 @@ export async function recentUsage(key, limit = 10) {
     order: "created_at.desc",
     limit: String(limit),
   });
-  return request(`/usage_log?${params.toString()}`);
+  try {
+    const rows = await request(`/usage_log?${params.toString()}`);
+    return rows || [];
+  } catch (err) {
+    // usage_log table may not exist yet (migration 002 not applied). Don't break /balance.
+    console.error("recentUsage failed:", err.message);
+    return [];
+  }
 }

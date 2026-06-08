@@ -263,7 +263,7 @@
               </div>`
             );
           } else {
-            showResult("error", "Ошибка", data.error || "Ключ не найден");
+            showResult("error", "Ошибка", extractError(data) || "Ключ не найден");
           }
         } catch (error) {
           showResult("error", "Ошибка", error.message);
@@ -271,6 +271,14 @@
           loading.classList.remove("show");
         }
       });
+
+      function extractError(data) {
+        if (!data) return "";
+        if (typeof data.error === "string") return data.error;
+        if (data.error && typeof data.error.message === "string") return data.error.message;
+        if (typeof data.message === "string") return data.message;
+        return "";
+      }
 
       function renderHistory(history) {
         if (!history.length) {
