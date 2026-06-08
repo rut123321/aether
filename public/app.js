@@ -32,6 +32,9 @@ const elements = {
   addCreditsForm: document.querySelector("#addCreditsForm"),
   addCreditsKey: document.querySelector("#addCreditsKey"),
   addCreditsAmount: document.querySelector("#addCreditsAmount"),
+  subtractCreditsForm: document.querySelector("#subtractCreditsForm"),
+  subtractCreditsKey: document.querySelector("#subtractCreditsKey"),
+  subtractCreditsAmount: document.querySelector("#subtractCreditsAmount"),
   customKeysList: document.querySelector("#customKeysList"),
   totalKeys: document.querySelector("#totalKeys"),
   totalCredits: document.querySelector("#totalCredits"),
@@ -197,6 +200,13 @@ function bindEvents() {
     event.preventDefault();
     await addCreditsToKey();
   });
+
+  if (elements.subtractCreditsForm) {
+    elements.subtractCreditsForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await subtractCreditsFromKey();
+    });
+  }
 
   const exportCsvButton = document.querySelector("#exportCsvButton");
   if (exportCsvButton) {
@@ -640,6 +650,36 @@ async function addCreditsToKey() {
       const data = await response.json();
       showToast(`Кредиты добавлены. Новый баланс: ${data.credits.toLocaleString()}`, "success");
       elements.addCreditsForm.reset();
+      await loadCustomKeys();
+      await loadStats();
+    } else {
+      showToast(await readErrorMessage(response), "error");
+    }
+  } catch (error) {
+    showToast(`Ошибка: ${error.message}`, "error");
+  }
+}
+
+async function subtractCreditsFromKey() {
+  const key = elements.subtractCreditsKey.value.trim();
+  const credits = elements.subtractCreditsAmount.value;
+
+  if (!key || !credits) {
+    showToast("Заполните все поля", "error");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/keys/subtract", {
+      method: "POST",
+      headers: getAdminHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ key, credits: Number(credits) }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      showToast(`Кредиты списаны. Новый баланс: ${data.credits.toLocaleString()}`, "success");
+      elements.subtractCreditsForm.reset();
       await loadCustomKeys();
       await loadStats();
     } else {

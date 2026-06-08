@@ -93,6 +93,21 @@ export async function addCredits(key, amount) {
   return Array.isArray(rows) ? rows[0] : rows;
 }
 
+export async function subtractCredits(key, amount) {
+  const current = await getKey(key);
+  if (!current) return null;
+  const next = Math.max(0, current.credits - amount);
+  const rows = await request(
+    `/api_keys?key=eq.${encodeURIComponent(key)}`,
+    {
+      method: "PATCH",
+      headers: { prefer: "return=representation" },
+      body: JSON.stringify({ credits: next }),
+    },
+  );
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
 export async function deductCredits(key, amount) {
   const result = await request("/rpc/deduct_credits", {
     method: "POST",

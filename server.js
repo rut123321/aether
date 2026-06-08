@@ -90,6 +90,7 @@ const UPSTREAM_USER_AGENT =
 const ALLOW_DIRECT_UPSTREAM_KEYS = process.env.ALLOW_DIRECT_UPSTREAM_KEYS === "true";
 const ALLOW_SERVER_KEY_PROXY = process.env.ALLOW_SERVER_KEY_PROXY === "true";
 const ALLOWED_MODELS = ["claude-opus-4-7", "glm-5.1"];
+const CREDITS_PER_TOKEN = readPositiveIntegerEnv("CREDITS_PER_TOKEN", 10);
 const AGENTROUTER_CLIENT_PROFILE = process.env.AGENTROUTER_CLIENT_PROFILE || "none";
 const CODEX_COMPAT_VERSION = process.env.AGENTROUTER_CODEX_VERSION || "0.101.0";
 const CODEX_COMPAT_USER_AGENT =
@@ -295,6 +296,32 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Subtract credits from existing key (admin)
+    if (url.pathname === "/api/keys/subtract" && req.method === "POST") {
+      const { key, credits } = await readJsonBody(req);
+      const targetKey = String(key || "").trim();
+      const creditsToSubtract = Number(credits);
+
+      if (!targetKey || !Number.isFinite(creditsToSubtract) || creditsToSubtract <= 0) {
+        sendJson(res, 400, { error: "key and positive credits are required" });
+        return;
+      }
+
+      const updated = await db.subtractCredits(targetKey, Math.floor(creditsToSubtract));
+      if (!updated) {
+        sendJson(res, 404, { error: "Key not found" });
+        return;
+      }
+
+      sendJson(res, 200, {
+        message: "Credits subtracted",
+        key: targetKey,
+        name: updated.name,
+        credits: updated.credits,
+      });
+      return;
+    }
+
     // Add credits to existing key
     if (url.pathname.startsWith("/api/keys/") && req.method === "POST") {
       const keyToAddCredits = url.pathname.slice("/api/keys/".length);
@@ -467,11 +494,19 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   }
 
   const upstreamUrl = buildUpstreamUrl(incomingUrl);
-  const requestBody = canHaveBody(req.method) ? await readRequestBody(req) : undefined;
+  let requestBody = canHaveBody(req.method) ? await readRequestBody(req) : undefined;
+
+  // Parse body once (used for model validation, stream detection, and forcing include_usage)
+  let parsedBody = null;
+  if (requestBody && requestBody.length) {
+    try {
+      parsedBody = JSON.parse(requestBody.toString());
+    } catch {}
+  }
 
   // Validate model if present in request body
-  if (requestBody && requestBody.model) {
-    const requestedModel = String(requestBody.model);
+  if (parsedBody && parsedBody.model) {
+    const requestedModel = String(parsedBody.model);
     if (!ALLOWED_MODELS.includes(requestedModel)) {
       sendJson(res, 400, {
         error: {
@@ -482,6 +517,17 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       });
       return;
     }
+  }
+
+  // For streaming requests with a custom key, force the upstream to include usage
+  // in the final SSE chunk so we deduct based on real tokens, not byte estimates.
+  const isStream = Boolean(parsedBody && parsedBody.stream === true);
+  if (usingCustomKey && isStream && parsedBody) {
+    parsedBody.stream_options = {
+      ...(parsedBody.stream_options || {}),
+      include_usage: true,
+    };
+    requestBody = Buffer.from(JSON.stringify(parsedBody));
   }
 
   const upstreamResult = await fetchUpstreamWithWafRetry(
@@ -534,22 +580,12 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   }
 
   if (usingCustomKey) {
-    // Check if this is a streaming request
-    let isStream = false;
-    if (requestBody) {
-      try {
-        const body = JSON.parse(requestBody.toString());
-        isStream = body.stream === true;
-      } catch {}
-    }
-
     if (isStream) {
       // Handle streaming response to deduct credits
       const reader = upstreamResponse.body.getReader();
       const decoder = new TextDecoder();
       let totalTokens = 0;
-      let responseCharCount = 0;
-      const requestCharCount = requestBody ? requestBody.toString().length : 0;
+      let buffer = "";
 
       const stream = new Readable({
         read() {}
@@ -558,36 +594,38 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       reader.read().then(async function process({ done, value }) {
         if (done) {
           stream.push(null);
-          // Fallback: estimate tokens from characters if usage not provided (~4 chars = 1 token)
-          const estimatedTokens = totalTokens || Math.ceil((requestCharCount + responseCharCount) / 4);
-          const creditsToDeduct = Math.ceil(Math.max(estimatedTokens, 1) * 10);
-          if (creditsToDeduct > 0) {
-            try {
-              await db.deductCredits(customApiKey, creditsToDeduct);
-            } catch (err) {
-              console.error("deductCredits failed:", err.message);
-            }
+          // Only deduct what the upstream actually reported. If usage was
+          // missing (some upstreams omit it), deduct a tiny minimum so we
+          // never invent giant token counts from response byte length.
+          const tokensToCharge = totalTokens > 0 ? totalTokens : 1;
+          const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
+          try {
+            await db.deductCredits(customApiKey, creditsToDeduct);
+          } catch (err) {
+            console.error("deductCredits failed:", err.message);
           }
           return;
         }
 
         const chunk = decoder.decode(value, { stream: true });
         stream.push(chunk);
-        responseCharCount += chunk.length;
 
-        // Try to extract token usage from streaming response
-        const lines = chunk.split("\n");
+        // Accumulate across chunks — SSE events can be split mid-line.
+        buffer += chunk;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.usage && parsed.usage.total_tokens) {
-                totalTokens = parsed.usage.total_tokens;
-              }
-            } catch {}
-          }
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (!data || data === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(data);
+            const tt = parsed.usage?.total_tokens;
+            if (typeof tt === "number" && tt > totalTokens) {
+              totalTokens = tt;
+            }
+          } catch {}
         }
 
         reader.read().then(process);
@@ -599,14 +637,13 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       const responseText = await upstreamResponse.text();
       try {
         const responseData = JSON.parse(responseText);
-        const totalTokens = responseData.usage?.total_tokens || 0;
-        const creditsToDeduct = Math.ceil(Math.max(totalTokens, 1) * 10);
-        if (creditsToDeduct > 0) {
-          try {
-            await db.deductCredits(customApiKey, creditsToDeduct);
-          } catch (err) {
-            console.error("deductCredits failed:", err.message);
-          }
+        const totalTokens = Number(responseData.usage?.total_tokens) || 0;
+        const tokensToCharge = totalTokens > 0 ? totalTokens : 1;
+        const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
+        try {
+          await db.deductCredits(customApiKey, creditsToDeduct);
+        } catch (err) {
+          console.error("deductCredits failed:", err.message);
         }
         res.end(responseText);
       } catch {
@@ -800,6 +837,7 @@ function isAdminApiPath(pathname) {
   return pathname === "/api/keys" ||
     pathname.startsWith("/api/keys/") ||
     pathname === "/api/keys/reveal" ||
+    pathname === "/api/keys/subtract" ||
     pathname === "/api/keys/export.csv" ||
     pathname === "/api/stats";
 }

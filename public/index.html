@@ -104,6 +104,18 @@
                 <button class="secondary-button" type="submit">Добавить кредиты</button>
               </form>
 
+              <form id="subtractCreditsForm" class="key-form" style="margin-top: 24px;">
+                <label>
+                  Ключ (полный sk-...)
+                  <input id="subtractCreditsKey" name="subtractCreditsKey" type="text" placeholder="sk-..." required />
+                </label>
+                <label>
+                  Списать кредитов
+                  <input id="subtractCreditsAmount" name="subtractCreditsAmount" type="number" min="1" value="100000" required />
+                </label>
+                <button class="danger-button" type="submit">Списать кредиты</button>
+              </form>
+
               <div class="keys-list" id="customKeysList">
                 <p>Загрузка ключей...</p>
               </div>
