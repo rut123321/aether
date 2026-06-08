@@ -584,7 +584,7 @@ aider --model openai/claude-opus-4-7</code>
 
           <div class="faq-item">
             <h3>Как работает списание кредитов?</h3>
-            <p>За каждый токен (вход + ответ) списывается 50 кредитов. Использование считается из поля <code>usage.total_tokens</code> в ответе модели. Историю запросов и баланс смотри на <a href="/balance" style="color: var(--primary);">/balance</a>.</p>
+            <p>За каждый токен (вход + ответ) списывается 25 кредитов. Использование считается из поля <code>usage</code> в ответе модели (для Anthropic — <code>input_tokens + output_tokens</code>, для OpenAI — <code>total_tokens</code>). Историю запросов и баланс смотри на <a href="/balance" style="color: var(--primary);">/balance</a>.</p>
           </div>
 
           <div class="faq-item">
