@@ -594,10 +594,14 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
     }
   }
 
-  // For streaming requests with a custom key, force the upstream to include usage
-  // in the final SSE chunk so we deduct based on real tokens, not byte estimates.
+  // For streaming OpenAI-shape requests with a custom key, force the upstream
+  // to include usage in the final SSE chunk so we deduct based on real tokens.
+  // Anthropic's /v1/messages doesn't understand stream_options and may 400 on it,
+  // and it always includes usage in message_start/message_delta anyway.
   const isStream = Boolean(parsedBody && parsedBody.stream === true);
-  if (usingCustomKey && isStream && parsedBody) {
+  const isAnthropicShape = incomingUrl.pathname.endsWith("/messages") ||
+    incomingUrl.pathname.includes("/messages?");
+  if (usingCustomKey && isStream && parsedBody && !isAnthropicShape) {
     parsedBody.stream_options = {
       ...(parsedBody.stream_options || {}),
       include_usage: true,
@@ -685,7 +689,14 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       // Handle streaming response to deduct credits
       const reader = upstreamResponse.body.getReader();
       const decoder = new TextDecoder();
-      let totalTokens = 0;
+      // Track input and output tokens separately so Anthropic SSE works:
+      //   message_start -> usage.input_tokens (output_tokens is a placeholder)
+      //   message_delta -> usage.output_tokens (final cumulative output count)
+      // OpenAI also fits: final chunk has usage.total_tokens, which the
+      // extractor returns as-is, and we max() it in below.
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let totalReported = 0;
       let streamModel = null;
       let buffer = "";
 
@@ -696,10 +707,11 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
       reader.read().then(async function process({ done, value }) {
         if (done) {
           stream.push(null);
-          // Only deduct what the upstream actually reported. If usage was
-          // missing (some upstreams omit it), deduct a tiny minimum so we
-          // never invent giant token counts from response byte length.
-          const tokensToCharge = totalTokens > 0 ? totalTokens : 1;
+          // Prefer the largest signal we have. OpenAI streams give us
+          // total_tokens directly; Anthropic streams give input + output.
+          const summed = inputTokens + outputTokens;
+          const tokens = Math.max(totalReported, summed);
+          const tokensToCharge = tokens > 0 ? tokens : 1;
           const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
           try {
             await db.deductCredits(customApiKey, creditsToDeduct);
@@ -724,18 +736,32 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
           if (!data || data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data);
-            const tt = parsed.usage?.total_tokens;
-            if (typeof tt === "number" && tt > totalTokens) {
-              totalTokens = tt;
-            }
-            if (!streamModel && typeof parsed.model === "string") {
-              streamModel = parsed.model;
-            }
+
+            // OpenAI: usage.total_tokens lands in the final chunk
+            const tt = Number(parsed.usage?.total_tokens) || 0;
+            if (tt > totalReported) totalReported = tt;
+
+            // Anthropic: message_start carries input_tokens
+            const inFromMessage = Number(parsed.message?.usage?.input_tokens) || 0;
+            const inFromDelta = Number(parsed.usage?.input_tokens) || 0;
+            const input = Math.max(inFromMessage, inFromDelta);
+            if (input > inputTokens) inputTokens = input;
+
+            // Anthropic: message_delta carries the final cumulative output_tokens.
+            // Also covers any vendor that sends output_tokens directly.
+            const outFromMessage = Number(parsed.message?.usage?.output_tokens) || 0;
+            const outFromDelta = Number(parsed.usage?.output_tokens) || 0;
+            const completion = Number(parsed.usage?.completion_tokens) || 0;
+            const output = Math.max(outFromMessage, outFromDelta, completion);
+            if (output > outputTokens) outputTokens = output;
+
+            const m = parsed.model || parsed.message?.model;
+            if (!streamModel && typeof m === "string") streamModel = m;
           } catch {}
         }
 
@@ -754,11 +780,39 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   }
 }
 
+// Pull a token count out of a parsed response/event regardless of provider shape.
+// Returns 0 if nothing usable is present.
+//   OpenAI:    usage.total_tokens                       (non-streaming + final SSE chunk with include_usage)
+//              usage.prompt_tokens + completion_tokens  (older shape)
+//   Anthropic: usage.input_tokens + usage.output_tokens (non-streaming)
+//              message_start event:  message.usage.input_tokens (output_tokens may be 1 placeholder)
+//              message_delta event:  usage.output_tokens (final count)
+function extractTokenUsage(parsed) {
+  if (!parsed || typeof parsed !== "object") return 0;
+
+  // Anthropic streaming uses event envelopes — usage may be on .message.usage or .usage
+  const candidates = [parsed.usage, parsed.message?.usage].filter(Boolean);
+
+  let best = 0;
+  for (const u of candidates) {
+    if (typeof u.total_tokens === "number" && u.total_tokens > 0) {
+      best = Math.max(best, u.total_tokens);
+      continue;
+    }
+    const input = Number(u.input_tokens ?? u.prompt_tokens ?? 0) || 0;
+    const output = Number(u.output_tokens ?? u.completion_tokens ?? 0) || 0;
+    if (input || output) {
+      best = Math.max(best, input + output);
+    }
+  }
+  return best;
+}
+
 async function deductCreditsFromResponseText(customApiKey, responseText, model) {
   try {
     const responseData = JSON.parse(responseText);
-    const totalTokens = Number(responseData.usage?.total_tokens) || 0;
-    const tokensToCharge = totalTokens > 0 ? totalTokens : 1;
+    const tokens = extractTokenUsage(responseData);
+    const tokensToCharge = tokens > 0 ? tokens : 1;
     const creditsToDeduct = tokensToCharge * CREDITS_PER_TOKEN;
     try {
       await db.deductCredits(customApiKey, creditsToDeduct);
