@@ -16,14 +16,30 @@ function generateApiKey() {
 
 function csvEscape(value) {
   const str = value === null || value === undefined ? "" : String(value);
-  if (/[",\n\r]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
+  // Prevent CSV injection (formula injection): leading =, +, -, @ or tab/CR
+  // are reinterpreted as formulas by spreadsheet apps. Prefix with single quote.
+  const needsFormulaGuard = /^[=+\-@\t\r]/.test(str);
+  const guarded = needsFormulaGuard ? `'${str}` : str;
+  if (/[",\n\r]/.test(guarded)) {
+    return `"${guarded.replace(/"/g, '""')}"`;
   }
-  return str;
+  return guarded;
 }
 
-// Session management
-const SESSION_SECRET = randomBytes(32).toString("hex");
+// Per-request CSP — only allow self, no remote scripts/styles, no inline.
+// Inline event handlers and inline <style> blocks are still allowed
+// because the bundled pages rely on them; locking down later would require
+// extracting them.
+const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+  "style-src 'self' 'unsafe-inline'; connect-src 'self'; " +
+  "img-src 'self' data:; font-src 'self' data:; " +
+  "frame-ancestors 'none'; base-uri 'self'; form-action 'self';";
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production" ||
+  Boolean(process.env.RENDER) || Boolean(process.env.RENDER_EXTERNAL_URL);
+
+// Session management — sessions live in memory and expire after SESSION_TTL_MS.
+const SESSION_TTL_MS = readPositiveIntegerEnv("SESSION_TTL_MS", 24 * 60 * 60 * 1000);
 const activeSessions = new Map();
 
 function parseCookie(req) {
@@ -45,12 +61,40 @@ function createSession() {
 function validateSession(req) {
   const cookies = parseCookie(req);
   const token = cookies.aether_session;
-  if (!token || !activeSessions.has(token)) return false;
+  if (!token) return false;
+  const entry = activeSessions.get(token);
+  if (!entry) return false;
+  if (Date.now() - entry.createdAt > SESSION_TTL_MS) {
+    activeSessions.delete(token);
+    return false;
+  }
   return true;
 }
 
 function clearSession(token) {
   activeSessions.delete(token);
+}
+
+// Periodically purge expired sessions so the Map doesn't grow unbounded.
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, entry] of activeSessions) {
+    if (now - entry.createdAt > SESSION_TTL_MS) {
+      activeSessions.delete(token);
+    }
+  }
+}, Math.min(SESSION_TTL_MS, 60 * 60 * 1000)).unref();
+
+function buildSessionCookie(token, maxAgeSeconds) {
+  const parts = [
+    `aether_session=${token}`,
+    "HttpOnly",
+    "Path=/",
+    `Max-Age=${maxAgeSeconds}`,
+    "SameSite=Strict",
+  ];
+  if (IS_PRODUCTION) parts.push("Secure");
+  return parts.join("; ");
 }
 
 const PORT = Number(process.env.PORT || 3000);
@@ -192,9 +236,10 @@ const server = createServer(async (req, res) => {
         return;
       }
       const { password } = await readJsonBody(req);
-      if (password === ADMIN_PASSWORD) {
+      const supplied = String(password || "");
+      if (ADMIN_PASSWORD && safeEqual(supplied, ADMIN_PASSWORD)) {
         const token = createSession();
-        res.setHeader("Set-Cookie", `aether_session=${token}; HttpOnly; Path=/; Max-Age=86400; SameSite=Strict`);
+        res.setHeader("Set-Cookie", buildSessionCookie(token, Math.floor(SESSION_TTL_MS / 1000)));
         sendJson(res, 200, { success: true });
       } else {
         sendJson(res, 401, { error: { message: "Invalid password" } });
@@ -207,7 +252,7 @@ const server = createServer(async (req, res) => {
       const cookies = parseCookie(req);
       const token = cookies.aether_session;
       if (token) clearSession(token);
-      res.setHeader("Set-Cookie", "aether_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict");
+      res.setHeader("Set-Cookie", buildSessionCookie("", 0));
       sendJson(res, 200, { success: true });
       return;
     }
@@ -249,6 +294,12 @@ const server = createServer(async (req, res) => {
         return;
       }
       const [prefix, suffix] = normalizedPartial.split("...");
+      // Only allow the same charset our generated keys use, so the strings
+      // passed to PostgREST cannot include filter operators or wildcards.
+      if (!/^sk-[a-zA-Z0-9]{1,16}$/.test(prefix) || !/^[a-zA-Z0-9]{1,16}$/.test(suffix)) {
+        sendJson(res, 400, { error: { message: "Invalid partial key format" } });
+        return;
+      }
       const matched = await db.findKeyByPartial(prefix, suffix);
       if (matched) {
         sendJson(res, 200, { fullKey: matched.key, name: matched.name });
@@ -358,10 +409,20 @@ const server = createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/balance" && req.method === "POST") {
+      if (!checkRateLimit(`balance:${clientIp}`, 30, 60000)) {
+        sendJson(res, 429, { error: { message: "Too many requests. Try again later." } });
+        return;
+      }
       const { key } = await readJsonBody(req);
-      const row = await db.getKey(key);
+      const normalizedKey = String(key || "").trim();
+      // Reject obviously malformed keys without hitting the DB.
+      if (!normalizedKey || !/^sk-[a-zA-Z0-9_-]{8,128}$/.test(normalizedKey)) {
+        sendJson(res, 404, { error: "Key not found" });
+        return;
+      }
+      const row = await db.getKey(normalizedKey);
       if (row) {
-        const history = await db.recentUsage(key, 10);
+        const history = await db.recentUsage(normalizedKey, 10);
         sendJson(res, 200, {
           balance: row.credits,
           name: row.name,
@@ -391,20 +452,14 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === "/balance") {
       const balanceHtml = await readFile(resolve(publicDir, "balance.html"), "utf8");
-      res.writeHead(200, {
-        "content-type": "text/html; charset=utf-8",
-        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
-      });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(balanceHtml);
       return;
     }
 
     if (url.pathname === "/faq") {
       const faqHtml = await readFile(resolve(publicDir, "faq.html"), "utf8");
-      res.writeHead(200, {
-        "content-type": "text/html; charset=utf-8",
-        "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
-      });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(faqHtml);
       return;
     }
@@ -1044,10 +1099,7 @@ async function serveStatic(url, res) {
   if (!existsSync(filePath)) {
     const fallback = resolve(publicDir, "index.html");
     const html = await readFile(fallback, "utf8");
-    res.writeHead(200, {
-      "content-type": MIME_TYPES[".html"],
-      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
-    });
+    res.writeHead(200, { "content-type": MIME_TYPES[".html"] });
     res.end(html);
     return;
   }
@@ -1055,15 +1107,9 @@ async function serveStatic(url, res) {
   const contentType = MIME_TYPES[extname(filePath).toLowerCase()] ||
     "application/octet-stream";
 
-  const extraHeaders = {
-    "cache-control": "no-store",
-  };
-  if (contentType === "text/html; charset=utf-8") {
-    extraHeaders["content-security-policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';";
-  }
   res.writeHead(200, {
     "content-type": contentType,
-    ...extraHeaders,
+    "cache-control": "no-store",
   });
   createReadStream(filePath).pipe(res);
 }
@@ -1094,6 +1140,12 @@ function addSecurityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Content-Security-Policy", CSP);
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  if (IS_PRODUCTION) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
 }
 
 function getHeaderValue(headers, headerName) {

@@ -94,18 +94,30 @@ export async function addCredits(key, amount) {
 }
 
 export async function subtractCredits(key, amount) {
-  const current = await getKey(key);
-  if (!current) return null;
-  const next = Math.max(0, current.credits - amount);
-  const rows = await request(
-    `/api_keys?key=eq.${encodeURIComponent(key)}`,
-    {
-      method: "PATCH",
-      headers: { prefer: "return=representation" },
-      body: JSON.stringify({ credits: next }),
-    },
-  );
-  return Array.isArray(rows) ? rows[0] : rows;
+  // Atomic via RPC — falls back to read-modify-write if the function is not deployed yet.
+  try {
+    const balance = await request("/rpc/subtract_credits", {
+      method: "POST",
+      body: JSON.stringify({ p_key: key, p_amount: amount }),
+    });
+    if (balance === null || balance === undefined) return null;
+    const current = await getKey(key);
+    return current;
+  } catch (err) {
+    console.error("subtract_credits RPC unavailable, using fallback:", err.message);
+    const current = await getKey(key);
+    if (!current) return null;
+    const next = Math.max(0, current.credits - amount);
+    const rows = await request(
+      `/api_keys?key=eq.${encodeURIComponent(key)}`,
+      {
+        method: "PATCH",
+        headers: { prefer: "return=representation" },
+        body: JSON.stringify({ credits: next }),
+      },
+    );
+    return Array.isArray(rows) ? rows[0] : rows;
+  }
 }
 
 export async function deductCredits(key, amount) {

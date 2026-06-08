@@ -3,54 +3,116 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Проверка баланса - Aether</title>
+    <title>Проверка баланса — Aether</title>
     <link rel="stylesheet" href="/styles.css" />
     <style>
       .standalone-wrapper {
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
         min-height: 100vh;
-        padding: 24px;
+        padding: 32px 24px;
+        overflow: hidden;
+      }
+      .standalone-wrapper::before,
+      .standalone-wrapper::after {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(90px);
+        pointer-events: none;
+        opacity: 0.4;
+      }
+      .standalone-wrapper::before {
+        width: 360px;
+        height: 360px;
+        background: radial-gradient(circle, rgba(34, 211, 238, 0.28), transparent 70%);
+        top: -100px;
+        left: -100px;
+        animation: drift 18s ease-in-out infinite;
+      }
+      .standalone-wrapper::after {
+        width: 420px;
+        height: 420px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.22), transparent 70%);
+        bottom: -120px;
+        right: -120px;
+        animation: drift 22s ease-in-out infinite reverse;
+      }
+      @keyframes drift {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(50px, -40px); }
       }
       .standalone-card {
+        position: relative;
         width: 100%;
-        max-width: 520px;
-        padding: 48px;
+        max-width: 580px;
+        padding: 44px 44px 36px;
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-lg);
-        background: var(--surface);
-        background-image: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(6, 182, 212, 0.04), transparent);
+        background: linear-gradient(180deg, rgba(15, 20, 36, 0.85), rgba(10, 13, 26, 0.92));
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
         box-shadow: var(--shadow-xl);
+        animation: cardIn 600ms var(--ease-spring);
+      }
+      .standalone-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1px;
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.26), transparent 40%, transparent 60%, rgba(99, 102, 241, 0.20));
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+                mask-composite: exclude;
+        pointer-events: none;
+      }
+      @keyframes cardIn {
+        from { opacity: 0; transform: translateY(20px) scale(0.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
       }
       .balance-header {
         text-align: center;
-        margin-bottom: 36px;
+        margin-bottom: 32px;
       }
+      .balance-mark {
+        display: inline-grid;
+        width: 52px;
+        height: 52px;
+        place-items: center;
+        border-radius: var(--radius);
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(99, 102, 241, 0.14));
+        margin-bottom: 16px;
+        border: 1px solid rgba(34, 211, 238, 0.26);
+        color: var(--primary);
+        box-shadow: 0 0 32px rgba(34, 211, 238, 0.16);
+      }
+      .balance-mark svg { width: 24px; height: 24px; }
       .balance-header h1 {
-        font-size: 32px;
-        margin-bottom: 8px;
+        font-size: 28px;
+        margin: 0 0 6px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
         background: var(--gradient-text);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        font-weight: 700;
-        letter-spacing: -0.5px;
       }
       .balance-header p {
         color: var(--muted);
         font-size: 14px;
+        margin: 0;
       }
       .result-card {
         margin-top: 24px;
-        padding: 24px;
+        padding: 22px;
         border-radius: var(--radius);
         display: none;
-        animation: slideIn 0.3s ease;
+        animation: slideIn 320ms var(--ease-out);
       }
-      .result-card.show {
-        display: block;
-      }
+      .result-card.show { display: block; }
       .result-card.success {
         background: var(--success-bg);
         border: 1px solid var(--success-border);
@@ -60,124 +122,154 @@
         border: 1px solid var(--danger-border);
       }
       .result-card h2 {
-        font-size: 16px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        font-size: 14px;
+        margin: 0 0 14px;
         font-weight: 600;
-      }
-      .result-card p {
-        margin: 8px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
         color: var(--ink);
-      }
-      .result-card strong {
-        color: var(--ink);
-        font-weight: 600;
       }
       .balance-info {
         display: grid;
         gap: 10px;
-        margin-top: 16px;
       }
       .balance-info-item {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         padding: 14px 18px;
-        background: var(--bg-elevated);
+        background: rgba(15, 20, 36, 0.5);
         border: 1px solid var(--line);
         border-radius: var(--radius-sm);
+        transition: border-color var(--dur) var(--ease);
       }
+      .balance-info-item:hover { border-color: var(--line-emphasis); }
       .balance-info-item label {
         color: var(--muted);
-        font-size: 12px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.6px;
       }
       .balance-info-item span {
         color: var(--ink);
-        font-weight: 600;
-        font-size: 14px;
+        font-weight: 700;
+        font-size: 15px;
+        font-variant-numeric: tabular-nums;
       }
-      .history-section {
-        margin-top: 24px;
+      .balance-info-item .credits-value {
+        background: var(--gradient-text);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 18px;
       }
+      .history-section { margin-top: 24px; }
       .history-title {
-        font-size: 13px;
+        font-size: 11px;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: 600;
+        letter-spacing: 0.6px;
+        font-weight: 700;
         margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .history-title::before {
+        content: "";
+        width: 4px;
+        height: 12px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
       }
       .history-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
+        background: rgba(15, 20, 36, 0.4);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
       }
-      .history-table th,
-      .history-table td {
-        padding: 10px 12px;
+      .history-table th, .history-table td {
+        padding: 10px 14px;
         text-align: left;
         border-bottom: 1px solid var(--line);
       }
+      .history-table tbody tr:last-child td { border-bottom: none; }
+      .history-table tbody tr {
+        transition: background-color var(--dur) var(--ease);
+      }
+      .history-table tbody tr:hover { background: rgba(34, 211, 238, 0.04); }
       .history-table th {
         color: var(--muted);
-        font-weight: 500;
-        font-size: 11px;
+        font-weight: 600;
+        font-size: 10px;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.5px;
+        background: rgba(10, 13, 26, 0.6);
       }
-      .history-table td {
-        color: var(--ink);
-      }
+      .history-table td { color: var(--ink); }
       .history-table td.numeric {
         text-align: right;
         font-variant-numeric: tabular-nums;
       }
+      .history-table .model-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        background: rgba(34, 211, 238, 0.10);
+        border: 1px solid rgba(34, 211, 238, 0.22);
+        border-radius: 999px;
+        color: var(--primary);
+        font-size: 11px;
+        font-family: "JetBrains Mono", monospace;
+      }
       .history-empty {
-        padding: 16px;
+        padding: 18px;
         text-align: center;
         color: var(--muted);
         font-size: 13px;
+        border: 1px dashed var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: rgba(15, 20, 36, 0.3);
       }
       .loading {
         text-align: center;
         color: var(--muted);
         margin-top: 20px;
         display: none;
-        padding: 20px;
-        font-size: 14px;
+        padding: 16px;
+        font-size: 13px;
       }
-      .loading.show {
-        display: block;
+      .loading.show { display: flex; align-items: center; justify-content: center; gap: 10px; }
+      .loading::before {
+        content: "";
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--line-strong);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
       }
+      @keyframes spin { to { transform: rotate(360deg); } }
       .back-link {
         text-align: center;
-        margin-top: 32px;
-        padding-top: 24px;
+        margin-top: 28px;
+        padding-top: 22px;
         border-top: 1px solid var(--line);
       }
       .back-link a {
         color: var(--muted);
         text-decoration: none;
-        font-size: 14px;
-        transition: color 0.2s;
+        font-size: 13px;
         font-weight: 500;
+        transition: color var(--dur) var(--ease);
       }
-      .back-link a:hover {
-        color: var(--primary-light);
-      }
+      .back-link a:hover { color: var(--primary); }
       @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
       }
     </style>
   </head>
@@ -185,25 +277,31 @@
     <div class="standalone-wrapper">
       <div class="standalone-card">
         <div class="balance-header">
+          <div class="balance-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7"/>
+              <path d="M3 7l9 6 9-6"/>
+              <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2"/>
+            </svg>
+          </div>
           <h1>Проверка баланса</h1>
-          <p>Введите ваш API ключ для проверки баланса кредитов</p>
+          <p>Введите API ключ, чтобы увидеть остаток и историю</p>
         </div>
         <form id="balanceForm" class="key-form" style="grid-template-columns: 1fr;">
           <label>
             API ключ
-            <input 
-              id="apiKey" 
-              type="text" 
-              placeholder="sk-..." 
-              required 
+            <input
+              id="apiKey"
+              type="text"
+              placeholder="sk-..."
+              required
               autocomplete="off"
+              spellcheck="false"
             />
           </label>
-          <button class="primary-button" type="submit" style="margin-top:4px;">Проверить баланс</button>
+          <button class="primary-button" type="submit" style="margin-top: 4px;">Проверить</button>
         </form>
-        <div class="loading" id="loading">
-          Проверка...
-        </div>
+        <div class="loading" id="loading">Проверяем...</div>
         <div class="result-card" id="result">
           <h2 id="resultTitle"></h2>
           <div id="resultContent"></div>
@@ -224,7 +322,7 @@
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const apiKey = document.getElementById("apiKey").value.trim();
-        
+
         if (!apiKey) {
           showResult("error", "Ошибка", "Введите API ключ");
           return;
@@ -254,7 +352,7 @@
                 </div>
                 <div class="balance-info-item">
                   <label>Кредиты</label>
-                  <span>${data.balance.toLocaleString()}</span>
+                  <span class="credits-value">${data.balance.toLocaleString()}</span>
                 </div>
               </div>
               <div class="history-section">
@@ -287,9 +385,10 @@
         const rows = history.map((h) => {
           const dt = h.createdAt ? new Date(h.createdAt) : null;
           const time = dt ? dt.toLocaleString() : "—";
+          const model = h.model ? `<span class="model-tag">${escapeHtml(h.model)}</span>` : "—";
           return `<tr>
             <td>${escapeHtml(time)}</td>
-            <td>${escapeHtml(h.model || "—")}</td>
+            <td>${model}</td>
             <td class="numeric">${Number(h.tokens || 0).toLocaleString()}</td>
             <td class="numeric">${Number(h.credits || 0).toLocaleString()}</td>
           </tr>`;
