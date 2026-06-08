@@ -198,6 +198,34 @@ function bindEvents() {
     await addCreditsToKey();
   });
 
+  const exportCsvButton = document.querySelector("#exportCsvButton");
+  if (exportCsvButton) {
+    exportCsvButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch("/api/keys/export.csv", {
+          headers: getAdminHeaders(),
+        });
+        if (!response.ok) {
+          showToast(await readErrorMessage(response), "error");
+          return;
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const today = new Date().toISOString().slice(0, 10);
+        a.download = `aether-keys-${today}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast("CSV скачан", "success");
+      } catch (error) {
+        showToast(`Ошибка: ${error.message}`, "error");
+      }
+    });
+  }
+
   document.querySelectorAll("[data-copy-target]").forEach((button) => {
     button.addEventListener("click", async () => {
       const target = document.querySelector(`#${button.dataset.copyTarget}`);

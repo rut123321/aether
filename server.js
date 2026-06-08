@@ -1,37 +1,25 @@
 import { createServer } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import * as db from "./db.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = resolve(__dirname, "public");
-const dataDir = resolve(__dirname, "data");
-const keysFile = resolve(dataDir, "keys.json");
-
-// Ensure data directory exists
-await mkdir(dataDir, { recursive: true });
-
-// Load or initialize keys database
-let apiKeys = await loadKeys();
-
-async function loadKeys() {
-  try {
-    const data = await readFile(keysFile, "utf8");
-    return JSON.parse(data);
-  } catch {
-    return {};
-  }
-}
-
-async function saveKeys() {
-  await writeFile(keysFile, JSON.stringify(apiKeys, null, 2));
-}
 
 function generateApiKey() {
   return `sk-${randomBytes(32).toString("hex")}`;
+}
+
+function csvEscape(value) {
+  const str = value === null || value === undefined ? "" : String(value);
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
 }
 
 // Session management
@@ -216,13 +204,30 @@ const server = createServer(async (req, res) => {
 
     // API Key management endpoints
     if (url.pathname === "/api/keys" && req.method === "GET") {
-      const keysList = Object.entries(apiKeys).map(([key, data]) => ({
-        key: key.slice(0, 8) + "..." + key.slice(-4),
-        name: data.name,
-        credits: data.credits,
-        createdAt: data.createdAt,
+      const rows = await db.listKeys();
+      const keysList = rows.map((row) => ({
+        key: row.key.slice(0, 8) + "..." + row.key.slice(-4),
+        name: row.name,
+        credits: row.credits,
+        createdAt: row.created_at,
       }));
       sendJson(res, 200, { keys: keysList });
+      return;
+    }
+
+    if (url.pathname === "/api/keys/export.csv" && req.method === "GET") {
+      const rows = await db.listKeys();
+      const header = "name,key,credits,created_at\n";
+      const body = rows
+        .map((r) => [r.name, r.key, r.credits, r.created_at].map(csvEscape).join(","))
+        .join("\n");
+      const filename = `aether-keys-${new Date().toISOString().slice(0, 10)}.csv`;
+      res.writeHead(200, {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="${filename}"`,
+        "cache-control": "no-store",
+      });
+      res.end(header + body + (body ? "\n" : ""));
       return;
     }
 
@@ -234,9 +239,9 @@ const server = createServer(async (req, res) => {
         return;
       }
       const [prefix, suffix] = normalizedPartial.split("...");
-      const matchedKey = Object.keys(apiKeys).find((k) => k.startsWith(prefix) && k.endsWith(suffix));
-      if (matchedKey) {
-        sendJson(res, 200, { fullKey: matchedKey, name: apiKeys[matchedKey].name });
+      const matched = await db.findKeyByPartial(prefix, suffix);
+      if (matched) {
+        sendJson(res, 200, { fullKey: matched.key, name: matched.name });
       } else {
         sendJson(res, 404, { error: { message: "Key not found" } });
       }
@@ -266,25 +271,23 @@ const server = createServer(async (req, res) => {
       }
 
       const newKey = generateApiKey();
-      apiKeys[newKey] = {
-        name: normalizedName,
-        credits: Math.floor(normalizedCredits),
-        createdAt: new Date().toISOString(),
-      };
-      await saveKeys();
-      sendJson(res, 201, {
+      const inserted = await db.insertKey({
         key: newKey,
         name: normalizedName,
-        credits: apiKeys[newKey].credits,
+        credits: Math.floor(normalizedCredits),
+      });
+      sendJson(res, 201, {
+        key: newKey,
+        name: inserted.name,
+        credits: inserted.credits,
       });
       return;
     }
 
     if (url.pathname.startsWith("/api/keys/") && req.method === "DELETE") {
       const keyToDelete = url.pathname.slice("/api/keys/".length);
-      if (apiKeys[keyToDelete]) {
-        delete apiKeys[keyToDelete];
-        await saveKeys();
+      const deleted = await db.deleteKey(keyToDelete);
+      if (deleted) {
         sendJson(res, 200, { message: "Key deleted" });
       } else {
         sendJson(res, 404, { error: "Key not found" });
@@ -298,31 +301,31 @@ const server = createServer(async (req, res) => {
       const { credits } = await readJsonBody(req);
       const creditsToAdd = Number(credits);
 
-      if (!apiKeys[keyToAddCredits]) {
-        sendJson(res, 404, { error: "Key not found" });
-        return;
-      }
-
       if (!Number.isFinite(creditsToAdd) || creditsToAdd <= 0) {
         sendJson(res, 400, { error: "Credits must be a positive number" });
         return;
       }
 
-      apiKeys[keyToAddCredits].credits += Math.floor(creditsToAdd);
-      await saveKeys();
+      const updated = await db.addCredits(keyToAddCredits, Math.floor(creditsToAdd));
+      if (!updated) {
+        sendJson(res, 404, { error: "Key not found" });
+        return;
+      }
+
       sendJson(res, 200, {
         message: "Credits added",
         key: keyToAddCredits,
-        name: apiKeys[keyToAddCredits].name,
-        credits: apiKeys[keyToAddCredits].credits,
+        name: updated.name,
+        credits: updated.credits,
       });
       return;
     }
 
     if (url.pathname === "/api/balance" && req.method === "POST") {
       const { key } = await readJsonBody(req);
-      if (apiKeys[key]) {
-        sendJson(res, 200, { balance: apiKeys[key].credits, name: apiKeys[key].name });
+      const row = await db.getKey(key);
+      if (row) {
+        sendJson(res, 200, { balance: row.credits, name: row.name });
       } else {
         sendJson(res, 404, { error: "Key not found" });
       }
@@ -330,11 +333,8 @@ const server = createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/stats" && req.method === "GET") {
-      const keysList = Object.entries(apiKeys);
-      const totalKeys = keysList.length;
-      const totalCredits = keysList.reduce((sum, [key, data]) => sum + data.credits, 0);
-      const activeKeys = keysList.filter(([key, data]) => data.credits > 0).length;
-      sendJson(res, 200, { totalKeys, totalCredits, activeKeys });
+      const s = await db.stats();
+      sendJson(res, 200, s);
       return;
     }
 
@@ -414,18 +414,20 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
   let usingCustomKey = false;
   let keyData = null;
 
-  if (customApiKey && apiKeys[customApiKey]) {
-    keyData = apiKeys[customApiKey];
-    usingCustomKey = true;
-    
-    if (keyData.credits <= 0) {
-      sendJson(res, 402, {
-        error: {
-          message: "Insufficient credits",
-          hint: "Your API key has no credits remaining.",
-        },
-      });
-      return;
+  if (customApiKey) {
+    keyData = await db.getKey(customApiKey);
+    if (keyData) {
+      usingCustomKey = true;
+
+      if (keyData.credits <= 0) {
+        sendJson(res, 402, {
+          error: {
+            message: "Insufficient credits",
+            hint: "Your API key has no credits remaining.",
+          },
+        });
+        return;
+      }
     }
   }
 
@@ -559,9 +561,12 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
           // Fallback: estimate tokens from characters if usage not provided (~4 chars = 1 token)
           const estimatedTokens = totalTokens || Math.ceil((requestCharCount + responseCharCount) / 4);
           const creditsToDeduct = Math.ceil(Math.max(estimatedTokens, 1) * 10);
-          if (creditsToDeduct > 0 && apiKeys[customApiKey]) {
-            apiKeys[customApiKey].credits -= creditsToDeduct;
-            await saveKeys();
+          if (creditsToDeduct > 0) {
+            try {
+              await db.deductCredits(customApiKey, creditsToDeduct);
+            } catch (err) {
+              console.error("deductCredits failed:", err.message);
+            }
           }
           return;
         }
@@ -596,9 +601,12 @@ async function proxyToAgentRouter(req, res, incomingUrl) {
         const responseData = JSON.parse(responseText);
         const totalTokens = responseData.usage?.total_tokens || 0;
         const creditsToDeduct = Math.ceil(Math.max(totalTokens, 1) * 10);
-        if (creditsToDeduct > 0 && apiKeys[customApiKey]) {
-          apiKeys[customApiKey].credits -= creditsToDeduct;
-          await saveKeys();
+        if (creditsToDeduct > 0) {
+          try {
+            await db.deductCredits(customApiKey, creditsToDeduct);
+          } catch (err) {
+            console.error("deductCredits failed:", err.message);
+          }
         }
         res.end(responseText);
       } catch {
@@ -792,6 +800,7 @@ function isAdminApiPath(pathname) {
   return pathname === "/api/keys" ||
     pathname.startsWith("/api/keys/") ||
     pathname === "/api/keys/reveal" ||
+    pathname === "/api/keys/export.csv" ||
     pathname === "/api/stats";
 }
 
