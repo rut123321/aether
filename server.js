@@ -143,7 +143,7 @@ const NON_STREAM_KEEPALIVE_INTERVAL_MS = readPositiveIntegerEnv(
 const ALLOW_DIRECT_UPSTREAM_KEYS = process.env.ALLOW_DIRECT_UPSTREAM_KEYS === "true";
 const ALLOW_SERVER_KEY_PROXY = process.env.ALLOW_SERVER_KEY_PROXY === "true";
 const ALLOWED_MODELS = ["claude-opus-4-7", "glm-5.1"];
-const CREDITS_PER_TOKEN = readPositiveIntegerEnv("CREDITS_PER_TOKEN", 50);
+const CREDITS_PER_TOKEN = readPositiveIntegerEnv("CREDITS_PER_TOKEN", 25);
 const AGENTROUTER_CLIENT_PROFILE = process.env.AGENTROUTER_CLIENT_PROFILE || "none";
 const CODEX_COMPAT_VERSION = process.env.AGENTROUTER_CODEX_VERSION || "0.101.0";
 const CODEX_COMPAT_USER_AGENT =
