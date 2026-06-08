@@ -36,16 +36,32 @@
         color: var(--muted);
         font-size: 15px;
       }
-      .endpoint-url {
-        display: inline-block;
-        padding: 12px 20px;
+      .endpoint-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 16px 0 8px;
+      }
+      .endpoint-card {
+        padding: 14px 18px;
         background: var(--bg-elevated);
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-sm);
+      }
+      .endpoint-card label {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .endpoint-card code {
         font-family: "JetBrains Mono", monospace;
         color: var(--primary);
         font-size: 13px;
-        margin: 16px 0;
+        word-break: break-all;
       }
       .section {
         margin-bottom: 48px;
@@ -57,6 +73,38 @@
         font-weight: 600;
         padding-bottom: 12px;
         border-bottom: 1px solid var(--line);
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tab-btn {
+        padding: 10px 16px;
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: inherit;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      .tab-btn:hover {
+        color: var(--ink);
+      }
+      .tab-btn.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+      }
+      .tab-pane {
+        display: none;
+      }
+      .tab-pane.active {
+        display: block;
       }
       .step {
         background: var(--bg-elevated);
@@ -78,7 +126,7 @@
         font-size: 14px;
         line-height: 1.6;
       }
-      .step ul {
+      .step ul, .step ol {
         margin: 8px 0 12px 20px;
         color: var(--muted);
         font-size: 14px;
@@ -183,97 +231,234 @@
     <div class="standalone-wrapper">
       <div class="standalone-card">
         <div class="faq-header">
-          <h1>Инструкция по подключению</h1>
-          <p>Как использовать Aether endpoint с Claude Code CLI</p>
+          <h1>Подключение Aether</h1>
+          <p>Гайды для Claude Code, OpenAI-совместимых клиентов, curl и других инструментов</p>
         </div>
 
         <div class="section">
           <h2>Ваш endpoint</h2>
-          <p style="text-align: center; margin-bottom: 8px;">
-            <code class="endpoint-url" id="endpointUrl">...</code>
-          </p>
-          <p style="text-align: center; color: var(--muted); font-size: 13px;">
-            Этот URL нужен для настройки Claude Code CLI
+          <div class="endpoint-grid">
+            <div class="endpoint-card">
+              <label>Base URL (Anthropic-совместимый)</label>
+              <code id="endpointAnthropic">...</code>
+            </div>
+            <div class="endpoint-card">
+              <label>Base URL (OpenAI-совместимый)</label>
+              <code id="endpointOpenai">...</code>
+            </div>
+          </div>
+          <p style="color: var(--muted); font-size: 13px; margin-top: 12px;">
+            Используйте Anthropic-вариант для Claude Code, Anthropic SDK и аналогов.
+            OpenAI-вариант (с <code>/v1</code>) работает с любым OpenAI-совместимым клиентом.
           </p>
         </div>
 
         <div class="section">
           <h2>Шаг 1: Получите API ключ</h2>
           <div class="step">
-            <p>Получите ключ у продавца.</p>
+            <p>Получите ключ <code>sk-...</code> у администратора. Проверить баланс и историю запросов можно на странице <a href="/balance" style="color: var(--primary);">/balance</a>.</p>
           </div>
         </div>
 
         <div class="section">
-          <h2>Шаг 2: Установите Claude Code CLI</h2>
-          <div class="step">
-            <p>Если Claude Code CLI еще не установлен:</p>
-            <div class="code-block">
-              <code>npm install -g @anthropic-ai/claude-code</code>
-            </div>
-            <p>После установки убедитесь, что команда доступна:</p>
-            <div class="code-block">
-              <code>claude --version</code>
+          <h2>Шаг 2: Подключите клиент</h2>
+
+          <div class="tabs" role="tablist">
+            <button class="tab-btn active" data-tab="claude-code">Claude Code CLI</button>
+            <button class="tab-btn" data-tab="anthropic-sdk">Anthropic SDK</button>
+            <button class="tab-btn" data-tab="openai-sdk">OpenAI SDK</button>
+            <button class="tab-btn" data-tab="curl">curl</button>
+            <button class="tab-btn" data-tab="cursor">Cursor / Continue</button>
+            <button class="tab-btn" data-tab="aider">aider</button>
+          </div>
+
+          <div class="tab-pane active" data-pane="claude-code">
+            <div class="step">
+              <div class="step-title">Установка в Claude Code CLI</div>
+              <ol>
+                <li>Скачиваем Claude Code CLI: <code>npm install -g @anthropic-ai/claude-code</code></li>
+                <li>Переходим в <code>C:\Users\ваш_пользователь\.claude</code> (на Mac/Linux: <code>~/.claude</code>)</li>
+                <li>Открываем <code>settings.json</code> и пишем туда:</li>
+              </ol>
+              <div class="code-block">
+                <code>{
+  "env": {
+    "ANTHROPIC_BASE_URL": "<span class="base-url-anthropic">...</span>",
+    "ANTHROPIC_AUTH_TOKEN": "ваш ключ",
+    "ANTHROPIC_API_KEY": "ваш ключ",
+    "ANTHROPIC_MODEL": "claude-opus-4-7"
+  },
+  "effortLevel": "xhigh",
+  "theme": "dark",
+  "skipDangerousModePermissionPrompt": true
+}</code>
+              </div>
+              <p>Сохраняем файл и запускаем <code>claude</code> в любой папке проекта. Готово!</p>
             </div>
           </div>
-        </div>
 
-        <div class="section">
-          <h2>Шаг 3: Настройте переменные окружения</h2>
-          <div class="step">
-            <p>Claude Code CLI использует переменные окружения <code>ANTHROPIC_API_KEY</code> и <code>ANTHROPIC_BASE_URL</code>. Вам нужно задать их перед каждым запуском или добавить в профиль shell.</p>
+          <div class="tab-pane" data-pane="anthropic-sdk">
+            <div class="step">
+              <div class="step-title">Anthropic SDK (Python)</div>
+              <div class="code-block">
+                <code>import anthropic
 
-            <p><strong>Для Linux/Mac (bash/zsh):</strong></p>
-            <div class="code-block">
-              <code>export ANTHROPIC_API_KEY="ваш-скопированный-ключ"
-export ANTHROPIC_BASE_URL="<span class="base-url-placeholder">...</span>"</code>
+client = anthropic.Anthropic(
+    base_url="<span class="base-url-anthropic">...</span>",
+    api_key="ваш ключ",
+)
+
+msg = client.messages.create(
+    model="claude-opus-4-7",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Привет"}],
+)
+print(msg.content[0].text)</code>
+              </div>
             </div>
+            <div class="step">
+              <div class="step-title">Anthropic SDK (Node.js)</div>
+              <div class="code-block">
+                <code>import Anthropic from "@anthropic-ai/sdk";
 
-            <p><strong>Для Windows (PowerShell):</strong></p>
-            <div class="code-block">
-              <code>$env:ANTHROPIC_API_KEY = "ваш-скопированный-ключ"
-$env:ANTHROPIC_BASE_URL = "<span class="base-url-placeholder">...</span>"</code>
+const client = new Anthropic({
+  baseURL: "<span class="base-url-anthropic">...</span>",
+  apiKey: "ваш ключ",
+});
+
+const msg = await client.messages.create({
+  model: "claude-opus-4-7",
+  max_tokens: 1024,
+  messages: [{ role: "user", content: "Привет" }],
+});
+console.log(msg.content[0].text);</code>
+              </div>
             </div>
-
-            <p><strong>Для постоянной настройки</strong> добавьте export-строки в файл <code>~/.bashrc</code>, <code>~/.zshrc</code> или <code>~/.profile</code> (Mac/Linux). На Windows добавьте через "Переменные среды" в настройках системы.</p>
           </div>
-        </div>
 
-        <div class="section">
-          <h2>Шаг 4: Запустите Claude Code</h2>
-          <div class="step">
-            <p>После настройки переменных запустите:</p>
-            <div class="code-block">
-              <code>claude</code>
+          <div class="tab-pane" data-pane="openai-sdk">
+            <div class="step">
+              <div class="step-title">OpenAI SDK (Python)</div>
+              <p>Любой OpenAI-совместимый клиент работает — просто укажите наш <code>base_url</code> с <code>/v1</code>.</p>
+              <div class="code-block">
+                <code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="<span class="base-url-openai">...</span>",
+    api_key="ваш ключ",
+)
+
+resp = client.chat.completions.create(
+    model="claude-opus-4-7",
+    messages=[{"role": "user", "content": "Привет"}],
+)
+print(resp.choices[0].message.content)</code>
+              </div>
             </div>
-            <p>Или для запуска в конкретной директории:</p>
-            <div class="code-block">
-              <code>claude /path/to/your/project</code>
+            <div class="step">
+              <div class="step-title">OpenAI SDK (Node.js)</div>
+              <div class="code-block">
+                <code>import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "<span class="base-url-openai">...</span>",
+  apiKey: "ваш ключ",
+});
+
+const resp = await client.chat.completions.create({
+  model: "claude-opus-4-7",
+  messages: [{ role: "user", content: "Привет" }],
+});
+console.log(resp.choices[0].message.content);</code>
+              </div>
             </div>
-            <p>Claude Code CLI автоматически подключится к вашему endpoint через <code>ANTHROPIC_BASE_URL</code>.</p>
+          </div>
+
+          <div class="tab-pane" data-pane="curl">
+            <div class="step">
+              <div class="step-title">Чистый HTTP запрос</div>
+              <p><strong>OpenAI-совместимый формат:</strong></p>
+              <div class="code-block">
+                <code>curl <span class="base-url-openai">...</span>/chat/completions \
+  -H "Authorization: Bearer ваш_ключ" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [{"role": "user", "content": "Привет"}]
+  }'</code>
+              </div>
+              <p style="margin-top: 16px;"><strong>Со стримингом (SSE):</strong></p>
+              <div class="code-block">
+                <code>curl -N <span class="base-url-openai">...</span>/chat/completions \
+  -H "Authorization: Bearer ваш_ключ" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [{"role": "user", "content": "Привет"}],
+    "stream": true
+  }'</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane" data-pane="cursor">
+            <div class="step">
+              <div class="step-title">Cursor</div>
+              <ol>
+                <li>Открой <strong>Settings → Models</strong></li>
+                <li>В разделе OpenAI нажми <strong>Override OpenAI Base URL</strong></li>
+                <li>Вставь: <code><span class="base-url-openai">...</span></code></li>
+                <li>В <strong>OpenAI API Key</strong> вставь свой <code>sk-...</code> ключ</li>
+                <li>В списке моделей добавь <code>claude-opus-4-7</code></li>
+              </ol>
+            </div>
+            <div class="step">
+              <div class="step-title">Continue (VS Code / JetBrains)</div>
+              <p>В <code>~/.continue/config.json</code>:</p>
+              <div class="code-block">
+                <code>{
+  "models": [
+    {
+      "title": "Aether Claude",
+      "provider": "openai",
+      "model": "claude-opus-4-7",
+      "apiBase": "<span class="base-url-openai">...</span>",
+      "apiKey": "ваш ключ"
+    }
+  ]
+}</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane" data-pane="aider">
+            <div class="step">
+              <div class="step-title">aider</div>
+              <p>Через переменные окружения:</p>
+              <div class="code-block">
+                <code>export OPENAI_API_BASE="<span class="base-url-openai">...</span>"
+export OPENAI_API_KEY="ваш ключ"
+aider --model openai/claude-opus-4-7</code>
+              </div>
+              <p style="margin-top: 12px;">На Windows PowerShell:</p>
+              <div class="code-block">
+                <code>$env:OPENAI_API_BASE = "<span class="base-url-openai">...</span>"
+$env:OPENAI_API_KEY = "ваш ключ"
+aider --model openai/claude-opus-4-7</code>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="section">
           <h2>Доступные модели</h2>
           <div class="info-box">
-            <p>Наш endpoint поддерживает только две модели:</p>
+            <p>Endpoint поддерживает только две модели:</p>
             <div class="model-list">
               <span class="model-tag">claude-opus-4-7</span>
               <span class="model-tag">glm-5.1</span>
             </div>
-            <p style="margin-top: 8px;">Запросы к другим моделям будут отклонены. По умолчанию используется <code>claude-opus-4-7</code>.</p>
-          </div>
-          <p style="color: var(--muted); font-size: 14px; margin-top: 12px;">Чтобы явно указать модель, используйте флаг <code>--model</code>:</p>
-          <div class="code-block">
-            <code>claude --model claude-opus-4-7</code>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2>Проверка баланса</h2>
-          <div class="info-box">
-            <p>Вы можете проверить оставшийся баланс кредитов вашего ключа на странице <a href="/balance" style="color: var(--primary);">/balance</a>. Введите ваш API ключ и нажмите "Проверить баланс".</p>
+            <p style="margin-top: 8px;">Запросы к другим моделям будут отклонены с ошибкой 400.</p>
           </div>
         </div>
 
@@ -281,38 +466,66 @@ $env:ANTHROPIC_BASE_URL = "<span class="base-url-placeholder">...</span>"</code>
           <h2>Часто задаваемые вопросы</h2>
 
           <div class="faq-item">
-            <h3>Почему я получаю ошибку "Invalid token"?</h3>
+            <h3>Какой URL использовать — с /v1 или без?</h3>
             <ul>
-              <li>Убедитесь, что вы используете кастомный API ключ, созданный на этом endpoint, а не ключ от Anthropic</li>
-              <li>Ключ должен быть скопирован полностью, без пробелов в начале или конце</li>
-              <li>Проверьте, что <code>ANTHROPIC_BASE_URL</code> указывает на правильный endpoint</li>
+              <li><strong>Без /v1</strong> (Anthropic Base URL) — для Claude Code, Anthropic SDK, всего что говорит на нативном Anthropic API</li>
+              <li><strong>С /v1</strong> (OpenAI Base URL) — для OpenAI SDK, Cursor, Continue, aider, curl, любых OpenAI-совместимых клиентов</li>
             </ul>
           </div>
 
           <div class="faq-item">
-            <h3>Что делать если закончились кредиты?</h3>
-            <p>Свяжитесь с администратором endpoint для пополнения баланса вашего ключа. В админ-панели можно создать новый ключ или увеличить лимит существующего.</p>
-          </div>
-
-          <div class="faq-item">
             <h3>Как работает списание кредитов?</h3>
-            <p>С каждого запроса списывается количество кредитов, пропорциональное количеству токенов в запросе и ответе. Подробная информация о расходе доступна после каждого ответа.</p>
+            <p>За каждый токен (вход + ответ) списывается 50 кредитов. Использование считается из поля <code>usage.total_tokens</code> в ответе модели. Историю запросов и баланс смотри на <a href="/balance" style="color: var(--primary);">/balance</a>.</p>
           </div>
 
           <div class="faq-item">
-            <h3>Можно ли использовать endpoint без Claude Code CLI?</h3>
-            <p>Да. Endpoint поддерживает стандартный OpenAI-compatible API. Вы можете использовать любой клиент, который позволяет задать <code>baseURL</code> и <code>apiKey</code>, например OpenAI SDK, HTTP-клиенты или другие инструменты.</p>
+            <h3>Получаю "Invalid token" или 401</h3>
+            <ul>
+              <li>Используй кастомный ключ <code>sk-...</code> с этого endpoint, а не оригинальный Anthropic/OpenAI ключ</li>
+              <li>Проверь, что ключ скопирован полностью, без пробелов</li>
+              <li>Убедись, что Base URL указывает именно на этот сервис</li>
+            </ul>
+          </div>
+
+          <div class="faq-item">
+            <h3>Что делать, если закончились кредиты?</h3>
+            <p>Свяжитесь с администратором — он пополнит баланс ключа в админ-панели. До пополнения запросы будут возвращать 402 Insufficient credits.</p>
+          </div>
+
+          <div class="faq-item">
+            <h3>Стриминг работает?</h3>
+            <p>Да, поддерживается SSE-стриминг через <code>stream: true</code>. Кредиты списываются по реальному <code>usage.total_tokens</code> в финальном чанке.</p>
           </div>
         </div>
 
+        <div class="back-link">
+          <a href="/">← На главную</a>
+        </div>
       </div>
     </div>
 
     <script>
-      const baseUrl = window.location.origin + "/v1";
-      document.getElementById("endpointUrl").textContent = baseUrl;
-      document.querySelectorAll(".base-url-placeholder").forEach(el => {
-        el.textContent = baseUrl;
+      const origin = window.location.origin;
+      const anthropicBase = origin;
+      const openaiBase = origin + "/v1";
+
+      document.getElementById("endpointAnthropic").textContent = anthropicBase;
+      document.getElementById("endpointOpenai").textContent = openaiBase;
+      document.querySelectorAll(".base-url-anthropic").forEach((el) => {
+        el.textContent = anthropicBase;
+      });
+      document.querySelectorAll(".base-url-openai").forEach((el) => {
+        el.textContent = openaiBase;
+      });
+
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const target = btn.dataset.tab;
+          document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+          document.querySelectorAll(".tab-pane").forEach((p) => {
+            p.classList.toggle("active", p.dataset.pane === target);
+          });
+        });
       });
     </script>
   </body>
