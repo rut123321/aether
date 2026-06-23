@@ -27,7 +27,7 @@
       .standalone-wrapper::before {
         width: 360px;
         height: 360px;
-        background: radial-gradient(circle, rgba(34, 211, 238, 0.28), transparent 70%);
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.34), transparent 70%);
         top: -100px;
         left: -100px;
         animation: drift 18s ease-in-out infinite;
@@ -35,7 +35,7 @@
       .standalone-wrapper::after {
         width: 420px;
         height: 420px;
-        background: radial-gradient(circle, rgba(99, 102, 241, 0.22), transparent 70%);
+        background: radial-gradient(circle, rgba(56, 189, 248, 0.26), transparent 70%);
         bottom: -120px;
         right: -120px;
         animation: drift 22s ease-in-out infinite reverse;
@@ -51,7 +51,7 @@
         padding: 44px 44px 36px;
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-lg);
-        background: linear-gradient(180deg, rgba(15, 20, 36, 0.85), rgba(10, 13, 26, 0.92));
+        background: linear-gradient(180deg, rgba(17, 19, 42, 0.80), rgba(11, 13, 30, 0.90));
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
         box-shadow: var(--shadow-xl);
@@ -63,7 +63,7 @@
         inset: 0;
         border-radius: inherit;
         padding: 1px;
-        background: linear-gradient(135deg, rgba(34, 211, 238, 0.26), transparent 40%, transparent 60%, rgba(99, 102, 241, 0.20));
+        background: linear-gradient(135deg, rgba(167, 139, 250, 0.40), transparent 40%, transparent 60%, rgba(56, 189, 248, 0.30));
         -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
         -webkit-mask-composite: xor;
                 mask-composite: exclude;
@@ -83,18 +83,18 @@
         height: 52px;
         place-items: center;
         border-radius: var(--radius);
-        background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(99, 102, 241, 0.14));
+        background: var(--gradient-iris);
         margin-bottom: 16px;
-        border: 1px solid rgba(34, 211, 238, 0.26);
-        color: var(--primary);
-        box-shadow: 0 0 32px rgba(34, 211, 238, 0.16);
+        color: #0b0d1e;
+        box-shadow: 0 8px 34px rgba(139, 92, 246, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.28);
       }
       .balance-mark svg { width: 24px; height: 24px; }
       .balance-header h1 {
+        font-family: "Sora", "Inter", sans-serif;
         font-size: 28px;
         margin: 0 0 6px;
-        font-weight: 700;
-        letter-spacing: -0.5px;
+        font-weight: 800;
+        letter-spacing: -0.6px;
         background: var(--gradient-text);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -201,7 +201,7 @@
       .history-table tbody tr {
         transition: background-color var(--dur) var(--ease);
       }
-      .history-table tbody tr:hover { background: rgba(34, 211, 238, 0.04); }
+      .history-table tbody tr:hover { background: rgba(167, 139, 250, 0.06); }
       .history-table th {
         color: var(--muted);
         font-weight: 600;
@@ -218,8 +218,8 @@
       .history-table .model-tag {
         display: inline-block;
         padding: 2px 8px;
-        background: rgba(34, 211, 238, 0.10);
-        border: 1px solid rgba(34, 211, 238, 0.22);
+        background: rgba(167, 139, 250, 0.12);
+        border: 1px solid rgba(167, 139, 250, 0.28);
         border-radius: 999px;
         color: var(--primary);
         font-size: 11px;

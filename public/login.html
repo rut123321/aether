@@ -27,7 +27,7 @@
       .login-wrapper::before {
         width: 380px;
         height: 380px;
-        background: radial-gradient(circle, rgba(34, 211, 238, 0.30), transparent 70%);
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.38), transparent 70%);
         top: -120px;
         left: -120px;
         animation: float 14s ease-in-out infinite;
@@ -35,7 +35,7 @@
       .login-wrapper::after {
         width: 420px;
         height: 420px;
-        background: radial-gradient(circle, rgba(99, 102, 241, 0.28), transparent 70%);
+        background: radial-gradient(circle, rgba(56, 189, 248, 0.30), transparent 70%);
         bottom: -140px;
         right: -140px;
         animation: float 18s ease-in-out infinite reverse;
@@ -51,7 +51,7 @@
         padding: 44px 40px 36px;
         border: 1px solid var(--line-strong);
         border-radius: var(--radius-lg);
-        background: linear-gradient(180deg, rgba(15, 20, 36, 0.85), rgba(10, 13, 26, 0.92));
+        background: linear-gradient(180deg, rgba(17, 19, 42, 0.80), rgba(11, 13, 30, 0.90));
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
         box-shadow: var(--shadow-xl);
@@ -63,7 +63,7 @@
         inset: 0;
         border-radius: inherit;
         padding: 1px;
-        background: linear-gradient(135deg, rgba(34, 211, 238, 0.30), transparent 40%, transparent 60%, rgba(99, 102, 241, 0.24));
+        background: linear-gradient(135deg, rgba(167, 139, 250, 0.45), transparent 40%, transparent 60%, rgba(56, 189, 248, 0.34));
         -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
         -webkit-mask-composite: xor;
                 mask-composite: exclude;
@@ -80,25 +80,26 @@
         height: 56px;
         place-items: center;
         border-radius: var(--radius);
-        background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(99, 102, 241, 0.14));
-        color: var(--primary);
-        font-weight: 700;
+        background: var(--gradient-iris);
+        color: #0b0d1e;
+        font-family: "Sora", "Inter", sans-serif;
+        font-weight: 800;
         font-size: 18px;
         letter-spacing: -0.5px;
         margin-bottom: 18px;
-        border: 1px solid rgba(34, 211, 238, 0.26);
-        box-shadow: 0 0 40px rgba(34, 211, 238, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        box-shadow: 0 8px 40px rgba(139, 92, 246, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.30);
         animation: markGlow 4s ease-in-out infinite;
       }
       @keyframes markGlow {
-        0%, 100% { box-shadow: 0 0 30px rgba(34, 211, 238, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
-        50% { box-shadow: 0 0 50px rgba(34, 211, 238, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+        0%, 100% { box-shadow: 0 6px 30px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+        50% { box-shadow: 0 10px 54px rgba(139, 92, 246, 0.60), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
       }
       .login-header h1 {
         margin: 0 0 8px;
-        font-size: 26px;
-        font-weight: 700;
-        letter-spacing: -0.5px;
+        font-family: "Sora", "Inter", sans-serif;
+        font-size: 27px;
+        font-weight: 800;
+        letter-spacing: -0.6px;
         background: var(--gradient-text);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
