@@ -762,7 +762,9 @@ function formatNumber(num) {
 async function readErrorMessage(response) {
   try {
     const data = await response.json();
-    return data.error?.message || data.error || `HTTP ${response.status}`;
+    const base = data.error?.message || data.error || `HTTP ${response.status}`;
+    const detail = data.error?.detail;
+    return detail ? `${base} — ${detail}` : base;
   } catch {
     return `HTTP ${response.status}`;
   }

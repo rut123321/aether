@@ -26,13 +26,13 @@ function csvEscape(value) {
   return guarded;
 }
 
-// Per-request CSP — only allow self, no remote scripts/styles, no inline.
-// Inline event handlers and inline <style> blocks are still allowed
-// because the bundled pages rely on them; locking down later would require
-// extracting them.
+// Per-request CSP — only allow self plus the Google Fonts origins the bundled
+// pages import. No remote scripts. Inline event handlers and inline <style>
+// blocks are still allowed because the bundled pages rely on them.
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
-  "style-src 'self' 'unsafe-inline'; connect-src 'self'; " +
-  "img-src 'self' data:; font-src 'self' data:; " +
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "connect-src 'self'; img-src 'self' data:; " +
+  "font-src 'self' data: https://fonts.gstatic.com; " +
   "frame-ancestors 'none'; base-uri 'self'; form-action 'self';";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production" ||
