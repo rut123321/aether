@@ -23,14 +23,25 @@ function stripTrailingSlash(value) {
 }
 
 async function request(path, init = {}) {
-  const response = await fetch(`${REST}${path}`, {
-    ...init,
-    headers: {
-      ...BASE_HEADERS,
-      "content-type": "application/json",
-      ...(init.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${REST}${path}`, {
+      ...init,
+      headers: {
+        ...BASE_HEADERS,
+        "content-type": "application/json",
+        ...(init.headers || {}),
+      },
+    });
+  } catch (err) {
+    // Network-level failure (DNS, refused, TLS) — almost always a wrong or
+    // dead SUPABASE_URL, not a bug. Surface a message that says exactly that.
+    const code = err?.cause?.code || err?.code || err?.message || "network error";
+    throw new Error(
+      `Cannot reach Supabase at ${SUPABASE_URL} (${code}). ` +
+      `Check SUPABASE_URL points to an existing, running project.`,
+    );
+  }
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Supabase ${response.status}: ${text}`);
