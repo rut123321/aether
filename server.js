@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
-import { extname, join, normalize, resolve } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import * as db from "./db.js";
@@ -182,10 +182,32 @@ function checkRateLimit(identifier, maxAttempts = 10, windowMs = 60000) {
   return true;
 }
 
+// Number of trusted reverse proxies in front of this server (e.g. Render = 1).
+// Only the IP appended by our own infrastructure is trustworthy; the leftmost
+// X-Forwarded-For entries are attacker-controlled and must not be used for
+// rate-limit/abuse identity. Default 1 in production (Render/Railway), 0 locally.
+const TRUSTED_PROXY_HOPS = readNonNegativeIntegerEnv(
+  "TRUSTED_PROXY_HOPS",
+  IS_PRODUCTION ? 1 : 0,
+);
+
 function getClientIdentifier(req) {
-  const forwarded = getHeaderValue(req.headers, "x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.socket.remoteAddress || "unknown";
+  const socketAddr = req.socket?.remoteAddress || "unknown";
+
+  if (TRUSTED_PROXY_HOPS > 0) {
+    const forwarded = getHeaderValue(req.headers, "x-forwarded-for");
+    if (forwarded) {
+      const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
+      // Take the entry our outermost trusted proxy appended (counting from the
+      // right). A client can prepend fake entries, but cannot control these.
+      const idx = parts.length - TRUSTED_PROXY_HOPS;
+      if (idx >= 0 && parts[idx]) {
+        return parts[idx];
+      }
+    }
+  }
+
+  return socketAddr;
 }
 
 const server = createServer(async (req, res) => {
@@ -1131,12 +1153,21 @@ function canUseDirectUpstreamKeys(req) {
 }
 
 function isLocalRequest(req) {
-  const hostHeader = (req.headers.host || "").toLowerCase();
-  const host = hostHeader.startsWith("[")
-    ? hostHeader.slice(1, hostHeader.indexOf("]"))
-    : hostHeader.split(":")[0];
+  // SECURITY: never trust the Host header for trust decisions — it is fully
+  // client-controlled, so `Host: localhost` would otherwise unlock the server
+  // API-key fallback, direct upstream keys, and (if ADMIN_TOKEN is unset) the
+  // admin API. On any public/production deploy nothing is "local".
+  if (IS_PRODUCTION) {
+    return false;
+  }
 
-  return ["localhost", "127.0.0.1", "::1"].includes(host);
+  // Use the real TCP peer address, which a remote client cannot forge.
+  const remote = (req.socket?.remoteAddress || "").toLowerCase();
+  const normalizedRemote = remote.startsWith("::ffff:")
+    ? remote.slice("::ffff:".length)
+    : remote;
+
+  return ["127.0.0.1", "::1"].includes(normalizedRemote);
 }
 
 async function serveStatic(url, res) {
@@ -1145,7 +1176,9 @@ async function serveStatic(url, res) {
   const normalized = normalize(requested).replace(/^(\.\.[/\\])+/, "");
   const filePath = resolve(join(publicDir, normalized));
 
-  if (!filePath.startsWith(publicDir)) {
+  // Containment check with a separator boundary so a sibling dir that merely
+  // shares the prefix (e.g. /app/public-secret vs /app/public) can't escape.
+  if (filePath !== publicDir && !filePath.startsWith(publicDir + sep)) {
     sendJson(res, 403, { error: { message: "Forbidden" } });
     return;
   }
@@ -1291,4 +1324,9 @@ function createHttpError(statusCode, message) {
 function readPositiveIntegerEnv(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function readNonNegativeIntegerEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
